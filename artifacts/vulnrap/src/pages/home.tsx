@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink } from "lucide-react";
+import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X } from "lucide-react";
 import { LogoBeams } from "@/components/laser-effects";
 import { useSubmitReport, SubmitReportBodyContentMode, useGetReportFeed } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -199,8 +199,35 @@ export default function Home() {
     }
   };
 
+  const [mirrorBannerDismissed, setMirrorBannerDismissed] = useState(() => {
+    try { return sessionStorage.getItem("vulnrap-mirror-dismissed") === "1"; } catch { return false; }
+  });
+
+  const dismissMirrorBanner = () => {
+    setMirrorBannerDismissed(true);
+    try { sessionStorage.setItem("vulnrap-mirror-dismissed", "1"); } catch {}
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-10">
+      {!mirrorBannerDismissed && (
+        <div className="relative mt-4 mx-auto max-w-3xl rounded-lg border border-primary/20 bg-primary/5 backdrop-blur-sm px-4 py-3 flex items-start gap-3 text-sm">
+          <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+          <div className="flex-1 text-muted-foreground leading-relaxed">
+            <span className="text-primary font-semibold">CyMeme.com</span> is the official alternate mirror for{" "}
+            <a href="https://vulnrap.com" className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors font-medium">VulnRap.com</a>.
+            {" "}Many enterprise networks block newly registered domains — if you can't reach VulnRap.com directly, you're in the right place. Same tool, same data, fully synced.
+          </div>
+          <button
+            onClick={dismissMirrorBanner}
+            className="shrink-0 text-muted-foreground/60 hover:text-primary transition-colors p-0.5 rounded"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6 text-center pt-6">
         <div className="relative flex justify-center">
           <div className="relative">
