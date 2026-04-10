@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint } from "lucide-react";
 import { useSubmitReport, SubmitReportBodyContentMode } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import logoSrc from "@/assets/logo.png";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".md"];
@@ -18,7 +19,7 @@ function validateFile(file: File): string | null {
   const ext = file.name.toLowerCase();
   const hasValidExt = ALLOWED_EXTENSIONS.some(e => ext.endsWith(e));
   if (!hasValidExt) {
-    return `Unsupported file type. Accepted formats: ${ALLOWED_EXTENSIONS.join(", ")}`;  
+    return `Unsupported file type. Accepted formats: ${ALLOWED_EXTENSIONS.join(", ")}`;
   }
   if (file.size > MAX_FILE_SIZE) {
     return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 20MB.`;
@@ -27,6 +28,17 @@ function validateFile(file: File): string | null {
     return "File is empty. Please select a file with content.";
   }
   return null;
+}
+
+function Explainer({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex ml-1 cursor-help">
+      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground/50 hover:text-primary transition-colors" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-md bg-popover border border-border px-3 py-2 text-xs text-popover-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg text-left font-normal normal-case">
+        {text}
+      </span>
+    </span>
+  );
 }
 
 export default function Home() {
@@ -140,12 +152,45 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="space-y-4 text-center">
+    <div className="max-w-4xl mx-auto space-y-10">
+      <div className="space-y-5 text-center pt-4">
+        <div className="flex justify-center">
+          <img src={logoSrc} alt="VulnRap" className="w-20 h-20 md:w-24 md:h-24 rounded-lg shadow-lg shadow-primary/20 border border-primary/20" />
+        </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary uppercase" data-testid="text-heading">Report Validation</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
           Validate your bug bounty reports before submission. We check for similarities against known reports and analyze your content for AI-generated "slop".
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/30">
+          <div className="p-2 rounded-md bg-primary/10">
+            <Fingerprint className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold mb-1">Similarity Fingerprinting</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">Your report is hashed using MinHash + LSH to detect near-duplicates in the corpus without exposing content.</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/30">
+          <div className="p-2 rounded-md bg-primary/10">
+            <Eye className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold mb-1">AI Slop Detection</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">Structural and linguistic analysis scores how likely your report is AI-generated, with actionable feedback.</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-card/30">
+          <div className="p-2 rounded-md bg-primary/10">
+            <Lock className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold mb-1">Zero-Knowledge Option</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">In Similarity Only mode, we never store your content. Only cryptographic hashes touch the disk.</p>
+          </div>
+        </div>
       </div>
 
       <Card className="border-primary/20 bg-card/40 backdrop-blur">
@@ -153,6 +198,7 @@ export default function Home() {
           <CardTitle className="flex items-center gap-2">
             <UploadCloud className="w-5 h-5 text-primary" />
             Upload Report
+            <Explainer text="Upload a vulnerability report file. We'll analyze it for AI-generated content and check it against previously submitted reports for similarity." />
           </CardTitle>
           <CardDescription>Supported formats: .txt, .md (Max 20MB)</CardDescription>
         </CardHeader>
@@ -216,6 +262,7 @@ export default function Home() {
             <h3 className="font-medium flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
               Privacy Mode
+              <Explainer text="Choose how your report data is handled after analysis. This controls whether we retain the original text or only store mathematical fingerprints." />
             </h3>
             <RadioGroup value={mode} onValueChange={(v) => setMode(v as SubmitReportBodyContentMode)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className={cn("border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors", mode === "similarity_only" ? "border-primary bg-primary/5" : "border-border")} onClick={() => setMode(SubmitReportBodyContentMode.similarity_only)}>
@@ -223,7 +270,7 @@ export default function Home() {
                   <RadioGroupItem value={SubmitReportBodyContentMode.similarity_only} id="similarity_only" className="mt-1" />
                   <div className="space-y-1">
                     <Label htmlFor="similarity_only" className="font-medium cursor-pointer">Similarity Only</Label>
-                    <p className="text-xs text-muted-foreground">Stores only document hashes for comparison. Content is discarded immediately after analysis. Recommended for sensitive zero-days.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Stores only document hashes for comparison. Your original content is discarded immediately after analysis. Best for sensitive zero-days and undisclosed vulnerabilities.</p>
                   </div>
                 </div>
               </div>
@@ -232,14 +279,14 @@ export default function Home() {
                   <RadioGroupItem value={SubmitReportBodyContentMode.full} id="full" className="mt-1" />
                   <div className="space-y-1">
                     <Label htmlFor="full" className="font-medium cursor-pointer">Full Storage</Label>
-                    <p className="text-xs text-muted-foreground">Stores the full content securely. Helps improve the community corpus for better matching.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Stores the full content securely. Contributes to the community corpus, improving detection accuracy for everyone. Recommended for already-disclosed bugs.</p>
                   </div>
                 </div>
               </div>
             </RadioGroup>
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex flex-col gap-3">
           <Button
             className="w-full h-12 text-lg font-bold gap-2"
             onClick={handleSubmit}
@@ -248,8 +295,41 @@ export default function Home() {
           >
             {getButtonContent()}
           </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Free and anonymous. No account required. <Link to="/privacy" className="text-primary hover:underline">Read our privacy policy</Link> to learn exactly what we store.
+          </p>
         </CardFooter>
       </Card>
+
+      <div className="border border-border/50 rounded-lg p-6 bg-card/20 space-y-4">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Zap className="w-5 h-5 text-primary" />
+          How It Works
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <div className="text-3xl font-bold text-primary/30">01</div>
+            <h3 className="font-medium text-sm">Upload</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Submit your vulnerability report as a .txt or .md file. We extract the text content and begin processing immediately.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-3xl font-bold text-primary/30">02</div>
+            <h3 className="font-medium text-sm">Analyze</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We generate cryptographic fingerprints (MinHash + Simhash) and run structural analysis to score AI-generation likelihood.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="text-3xl font-bold text-primary/30">03</div>
+            <h3 className="font-medium text-sm">Results</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Get a detailed report with your sloppiness score, similarity matches against existing reports, and actionable improvement feedback.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -27,13 +27,15 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ### Frontend (`artifacts/vulnrap/`)
 - React + Vite app at root path "/"
 - Dark terminal-inspired aesthetic with cyan/violet accents, Space Mono font
+- Custom AI-generated logo: synthetic bug inspected by lasers (`src/assets/logo.png`)
 - Pages:
-  - `/` — Home/upload page with drag-and-drop file zone + privacy mode selector
-  - `/results/:id` — Analysis results (slop score, similarity matches, feedback, share link)
+  - `/` — Home/upload with logo hero, 3 feature explainer cards, drag-and-drop upload, privacy mode selector, "How It Works" steps, hover hint tooltips
+  - `/results/:id` — Analysis results with score explainer text, similarity matches, feedback, hover hints on all sections
   - `/stats` — Platform statistics dashboard (metrics, distribution histogram, recent activity)
-  - `/privacy` — Privacy & security explanation page
+  - `/privacy` — Comprehensive privacy policy: mission statement, data collection details for both modes, anonymity guarantees, security infrastructure, researcher rights
 - Uses generated API hooks from `@workspace/api-client-react`
 - File upload supports .txt, .md (20MB max, client-side validated)
+- Hover explainer tooltips on all key UI elements (upload, privacy mode, scores, hashes, similarity)
 
 ### Similarity Engine (`artifacts/api-server/src/lib/similarity.ts`)
 - MinHash + Locality Sensitive Hashing (LSH) for near-duplicate detection

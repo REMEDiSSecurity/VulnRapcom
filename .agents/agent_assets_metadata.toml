@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "3sSWRbQM6htEkuSTJ4n2K"
+uri = "file://artifacts/vulnrap/src/assets/logo.png"
+type = "image"
+title = "vulnrap synthetic bug logo"
