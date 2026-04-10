@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Shield, Search } from "lucide-react";
+import { Activity, Shield, Search, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoSrc from "@/assets/logo.png";
 import { LaserEffects } from "@/components/laser-effects";
@@ -22,6 +22,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               { to: "/", label: "Submit", icon: null, match: pathname === "/" },
               { to: "/check", label: "Check", icon: <Search className="w-3.5 h-3.5" />, match: pathname === "/check" },
               { to: "/stats", label: "Stats", icon: <Activity className="w-3.5 h-3.5" />, match: pathname === "/stats" },
+              { to: "/developers", label: "API", icon: <Code className="w-3.5 h-3.5" />, match: pathname === "/developers" },
               { to: "/privacy", label: "Privacy", icon: <Shield className="w-3.5 h-3.5" />, match: pathname === "/privacy" },
             ].map((item) => (
               <Link
@@ -52,6 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <span className="text-muted-foreground/70">VulnRap // Free & Anonymous Vulnerability Report Validation — made by and for frustrated PSIRTlings</span>
             </div>
             <div className="flex gap-5">
+              <Link to="/developers" className="hover:text-primary transition-colors">API Docs</Link>
               <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
               <Link to="/stats" className="hover:text-primary transition-colors">Platform Stats</Link>
             </div>

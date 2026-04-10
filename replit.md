@@ -37,7 +37,8 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
   - `/results/:id` — Analysis results: slop score, auto-redaction summary, similarity matches, section-level analysis with per-section hashes, feedback, expandable redacted report view, verification badge with copy buttons, user feedback form (rating + helpful + suggestions)
   - `/check` — Receiver flow: paste/upload a report for read-only analysis (no storage), shows slop score, duplicates, redaction analysis
   - `/verify/:id` — Public verification page: lightweight badge view with slop score, match counts, content hash, submission date
-  - `/stats` — Platform statistics dashboard (metrics, distribution histogram, recent activity)
+  - `/stats` — Platform statistics dashboard (metrics, distribution histogram, recent activity) — auto-refreshes every 30s, interactive stat cards with hover details
+  - `/developers` — API documentation: quick start guide, all endpoints with curl examples, Swagger UI link, integration ideas (CI/CD, Slack bots, triage dashboards)
   - `/privacy` — Honest privacy policy: explains auto-redaction, what gets stored and compared, how comparison works, data lifecycle
 - Uses generated API hooks from `@workspace/api-client-react`
 - Dual input: file upload (.txt, .md, 20MB max) or direct text paste via plain-text textarea
