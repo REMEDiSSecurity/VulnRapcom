@@ -134,14 +134,14 @@ export default function Check() {
   const hasContent = inputMode === "file" ? !!file : inputMode === "link" ? reportUrl.trim().length > 0 : rawText.trim().length > 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="space-y-2 pt-4">
-        <h1 className="text-3xl font-bold tracking-tight text-primary uppercase flex items-center gap-3 glow-text">
-          <Shield className="w-8 h-8" />
+    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+      <div className="space-y-2 pt-2 sm:pt-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary uppercase flex items-center gap-2 sm:gap-3 glow-text">
+          <Shield className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />
           Check a Report
         </h1>
-        <p className="text-muted-foreground max-w-2xl">
-          For bug bounty programs and report receivers. Check an incoming vulnerability report against our database for duplicates and AI-generated content. Your report is auto-redacted during analysis but nothing is stored afterward.
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
+          For report receivers. Check an incoming report against our database for duplicates and AI content. Nothing is stored.
         </p>
         <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent mt-4" />
       </div>
@@ -155,42 +155,42 @@ export default function Check() {
           </CardTitle>
           <CardDescription>Auto-redacted during analysis, then discarded -- nothing is saved</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-yellow-500">Pre-sanitize if you can.</strong> Our auto-redaction catches most PII, secrets, and company names, but it is regex-based and not perfect. If your report contains information you would prefer not to share even temporarily during analysis, redact it yourself before pasting or uploading.
+        <CardContent className="space-y-5 sm:space-y-6">
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-muted-foreground leading-relaxed">
+            <strong className="text-yellow-500">Pre-sanitize if you can.</strong> Auto-redaction catches most PII and secrets, but it's regex-based. Redact sensitive details yourself before pasting.
           </div>
           <div className="flex rounded-xl overflow-hidden glass-card">
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all",
                 inputMode === "text" ? "bg-primary text-primary-foreground glow-button" : "hover:bg-muted/30 text-muted-foreground"
               )}
               onClick={() => setInputMode("text")}
             >
-              <ClipboardPaste className="w-4 h-4" />
-              Paste Text
+              <ClipboardPaste className="w-4 h-4 shrink-0" />
+              Paste
             </button>
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all border-l border-border/30",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all border-l border-border/30",
                 inputMode === "file" ? "bg-primary text-primary-foreground glow-button" : "hover:bg-muted/30 text-muted-foreground"
               )}
               onClick={() => setInputMode("file")}
             >
-              <UploadCloud className="w-4 h-4" />
-              Upload File
+              <UploadCloud className="w-4 h-4 shrink-0" />
+              File
             </button>
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all border-l border-border/30",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all border-l border-border/30",
                 inputMode === "link" ? "bg-primary text-primary-foreground glow-button" : "hover:bg-muted/30 text-muted-foreground"
               )}
               onClick={() => setInputMode("link")}
             >
-              <Link2 className="w-4 h-4" />
+              <Link2 className="w-4 h-4 shrink-0" />
               Link
             </button>
           </div>
@@ -243,7 +243,7 @@ export default function Check() {
           ) : (
             <div
               className={cn(
-                "border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
+                "border-2 border-dashed rounded-xl p-6 sm:p-10 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
                 isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:border-primary/40",
                 file && !fileError ? "border-primary/40 bg-primary/5" : "",
                 fileError ? "border-destructive bg-destructive/5" : ""
@@ -273,7 +273,7 @@ export default function Check() {
         </CardContent>
         <CardFooter>
           <Button
-            className="w-full h-12 text-lg font-bold gap-2 glow-button"
+            className="w-full h-11 sm:h-12 text-base sm:text-lg font-bold gap-2 glow-button"
             onClick={handleSubmit}
             disabled={!hasContent || checkMutation.isPending}
           >
@@ -288,10 +288,10 @@ export default function Check() {
 
       {result && (
         <div className="space-y-6">
-          <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
-            <CheckCircle className="w-6 h-6 text-primary" />
+          <h2 className="text-lg sm:text-xl font-bold uppercase tracking-tight flex items-center gap-2 flex-wrap">
+            <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
             Check Results
-            <Badge variant="outline" className="ml-2 text-xs">Not stored</Badge>
+            <Badge variant="outline" className="text-[10px] sm:text-xs">Not stored</Badge>
           </h2>
 
           {result.previouslySubmitted && (

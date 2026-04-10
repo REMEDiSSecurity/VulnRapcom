@@ -256,14 +256,14 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
+    <div className="max-w-4xl mx-auto space-y-8 sm:space-y-10">
       {!mirrorBannerDismissed && (
-        <div className="relative mt-4 mx-auto max-w-3xl rounded-lg border border-primary/20 bg-primary/5 backdrop-blur-sm px-4 py-3 flex items-start gap-3 text-sm">
+        <div className="relative mt-2 sm:mt-4 mx-auto max-w-3xl rounded-lg border border-primary/20 bg-primary/5 backdrop-blur-sm px-3 sm:px-4 py-3 flex items-start gap-2.5 sm:gap-3 text-sm">
           <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-          <div className="flex-1 text-muted-foreground leading-relaxed">
+          <div className="flex-1 text-muted-foreground leading-relaxed text-xs sm:text-sm">
             <span className="text-primary font-semibold">CyMeme.com</span> is the official alternate mirror for{" "}
             <a href="https://vulnrap.com" className="text-primary underline underline-offset-2 hover:text-primary/80 transition-colors font-medium">VulnRap.com</a>.
-            {" "}Many enterprise networks block newly registered domains — if you can't reach VulnRap.com directly, you're in the right place. Same tool, same data, fully synced.
+            {" "}Many enterprise networks block newly registered domains — if you can't reach VulnRap.com directly, you're in the right place.
           </div>
           <button
             onClick={dismissMirrorBanner}
@@ -275,48 +275,48 @@ export default function Home() {
         </div>
       )}
 
-      <div className="space-y-6 text-center pt-6">
+      <div className="space-y-4 sm:space-y-6 text-center pt-4 sm:pt-6">
         <div className="relative flex justify-center">
           <div className="relative">
             <LogoBeams />
             <div className="absolute inset-0 rounded-xl bg-primary/10 blur-3xl scale-150 z-0" />
-            <img src={logoSrc} alt="VulnRap" className="relative z-10 w-24 h-24 md:w-28 md:h-28 rounded-xl logo-glow gradient-border" />
+            <img src={logoSrc} alt="VulnRap" className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-xl logo-glow gradient-border" />
           </div>
         </div>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-primary uppercase glow-text" data-testid="text-heading">Report Validation</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+        <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight text-primary uppercase glow-text" data-testid="text-heading">Report Validation</h1>
+        <p className="text-sm sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed px-2">
           Validate your bug bounty reports before submission. We check for similarities against known reports and analyze your content for AI-generated "slop".
         </p>
       </div>
 
       <VideoSection />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="feature-card flex items-start gap-3 p-5 rounded-xl glass-card">
-          <div className="p-2.5 rounded-lg icon-glow-green flex-shrink-0">
-            <ShieldCheck className="w-5 h-5 text-green-400" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
+          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-green flex-shrink-0">
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold mb-1.5">Auto-Redaction</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, credentials, and company names are automatically scrubbed before your report is stored or compared.</p>
+            <h3 className="text-sm font-bold mb-1">Auto-Redaction</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, and company names are scrubbed before storage or comparison.</p>
           </div>
         </div>
-        <div className="feature-card flex items-start gap-3 p-5 rounded-xl glass-card">
-          <div className="p-2.5 rounded-lg icon-glow-cyan flex-shrink-0">
-            <Fingerprint className="w-5 h-5 text-cyan-400" />
+        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
+          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-cyan flex-shrink-0">
+            <Fingerprint className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold mb-1.5">Section-Level Hashing</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">Each section of your report is hashed independently, detecting partial matches even when full documents differ.</p>
+            <h3 className="text-sm font-bold mb-1">Section Hashing</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">Each section is hashed independently, detecting partial matches across reports.</p>
           </div>
         </div>
-        <div className="feature-card flex items-start gap-3 p-5 rounded-xl glass-card">
-          <div className="p-2.5 rounded-lg icon-glow-violet flex-shrink-0">
-            <Eye className="w-5 h-5 text-violet-400" />
+        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
+          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-violet flex-shrink-0">
+            <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold mb-1.5">AI Slop Detection</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">Structural and linguistic analysis scores how likely your report is AI-generated, with actionable feedback.</p>
+            <h3 className="text-sm font-bold mb-1">Slop Detection</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">Linguistic analysis scores AI-generation likelihood with actionable feedback.</p>
           </div>
         </div>
       </div>
@@ -330,15 +330,15 @@ export default function Home() {
           </CardTitle>
           <CardDescription>Upload a file, paste text, or link to a report (Max 20MB)</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-yellow-500">Heads up:</strong> We auto-redact PII, secrets, credentials, and company names before storing or comparing your report. But auto-redaction is regex-based and may miss edge cases. If your report contains specific details you want kept private, pre-sanitize those sections yourself before uploading.
+        <CardContent className="space-y-6 sm:space-y-8">
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-muted-foreground leading-relaxed">
+            <strong className="text-yellow-500">Heads up:</strong> We auto-redact PII, secrets, credentials, and company names before storing or comparing your report. If your report contains sensitive details, pre-sanitize those sections yourself before uploading.
           </div>
           <div className="flex rounded-xl overflow-hidden glass-card">
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all",
                 inputMode === "file"
                   ? "bg-primary text-primary-foreground glow-button"
                   : "hover:bg-muted/30 text-muted-foreground"
@@ -346,13 +346,13 @@ export default function Home() {
               onClick={() => { setInputMode("file"); setStage("idle"); }}
               data-testid="tab-file"
             >
-              <UploadCloud className="w-4 h-4" />
-              Upload File
+              <UploadCloud className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">Upload</span> File
             </button>
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all border-l border-border/30",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all border-l border-border/30",
                 inputMode === "text"
                   ? "bg-primary text-primary-foreground glow-button"
                   : "hover:bg-muted/30 text-muted-foreground"
@@ -360,13 +360,13 @@ export default function Home() {
               onClick={() => { setInputMode("text"); setStage("idle"); }}
               data-testid="tab-text"
             >
-              <ClipboardPaste className="w-4 h-4" />
-              Paste Text
+              <ClipboardPaste className="w-4 h-4 shrink-0" />
+              Paste
             </button>
             <button
               type="button"
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium transition-all border-l border-border/30",
+                "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 text-xs sm:text-sm font-medium transition-all border-l border-border/30",
                 inputMode === "link"
                   ? "bg-primary text-primary-foreground glow-button"
                   : "hover:bg-muted/30 text-muted-foreground"
@@ -374,7 +374,7 @@ export default function Home() {
               onClick={() => { setInputMode("link"); setStage("idle"); }}
               data-testid="tab-link"
             >
-              <Link2 className="w-4 h-4" />
+              <Link2 className="w-4 h-4 shrink-0" />
               Link
             </button>
           </div>
@@ -383,7 +383,7 @@ export default function Home() {
           <div
             data-testid="dropzone"
             className={cn(
-              "border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer",
+              "border-2 border-dashed rounded-xl p-6 sm:p-10 md:p-12 flex flex-col items-center justify-center gap-3 sm:gap-4 transition-all cursor-pointer",
               isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:border-primary/40",
               file && !fileError ? "border-primary/40 bg-primary/5" : "",
               fileError ? "border-destructive bg-destructive/5" : ""
@@ -530,9 +530,9 @@ export default function Home() {
             </RadioGroup>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-3">
+        <CardFooter className="flex flex-col gap-3 px-4 sm:px-6">
           <Button
-            className="w-full h-12 text-lg font-bold gap-2 glow-button"
+            className="w-full h-11 sm:h-12 text-base sm:text-lg font-bold gap-2 glow-button"
             onClick={handleSubmit}
             disabled={!hasContent || isProcessing || !!fileError}
             data-testid="button-submit"
@@ -545,38 +545,38 @@ export default function Home() {
         </CardFooter>
       </Card>
 
-      <div className="glass-card rounded-xl p-6 space-y-5">
+      <div className="glass-card rounded-xl p-4 sm:p-6 space-y-4 sm:space-y-5">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Zap className="w-5 h-5 text-primary" />
           How It Works
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-2 p-4 rounded-xl glass-card feature-card">
-            <div className="text-3xl font-bold step-number">01</div>
-            <h3 className="font-medium text-sm">Submit</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Upload a .txt or .md file, or paste your report text directly. We extract the content and begin processing immediately.
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="space-y-1.5 sm:space-y-2 p-3 sm:p-4 rounded-xl glass-card feature-card">
+            <div className="text-2xl sm:text-3xl font-bold step-number">01</div>
+            <h3 className="font-medium text-xs sm:text-sm">Submit</h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+              Upload a file, paste text, or link a URL. We begin processing immediately.
             </p>
           </div>
-          <div className="space-y-2 p-4 rounded-xl glass-card feature-card">
-            <div className="text-3xl font-bold step-number">02</div>
-            <h3 className="font-medium text-sm">Auto-Redact</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              PII, secrets, credentials, and company names are automatically scrubbed. Only the redacted version is used from this point.
+          <div className="space-y-1.5 sm:space-y-2 p-3 sm:p-4 rounded-xl glass-card feature-card">
+            <div className="text-2xl sm:text-3xl font-bold step-number">02</div>
+            <h3 className="font-medium text-xs sm:text-sm">Auto-Redact</h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+              PII, secrets, and company names are scrubbed automatically before anything is stored.
             </p>
           </div>
-          <div className="space-y-2 p-4 rounded-xl glass-card feature-card">
-            <div className="text-3xl font-bold step-number">03</div>
-            <h3 className="font-medium text-sm">Analyze</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              We hash each section independently, compare against all existing reports, and score AI-generation likelihood.
+          <div className="space-y-1.5 sm:space-y-2 p-3 sm:p-4 rounded-xl glass-card feature-card">
+            <div className="text-2xl sm:text-3xl font-bold step-number">03</div>
+            <h3 className="font-medium text-xs sm:text-sm">Analyze</h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+              Each section is hashed, compared against existing reports, and scored for AI likelihood.
             </p>
           </div>
-          <div className="space-y-2 p-4 rounded-xl glass-card feature-card">
-            <div className="text-3xl font-bold step-number">04</div>
-            <h3 className="font-medium text-sm">Results</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Get your slop score, similarity matches, section-level hash analysis, redaction summary, and improvement feedback.
+          <div className="space-y-1.5 sm:space-y-2 p-3 sm:p-4 rounded-xl glass-card feature-card">
+            <div className="text-2xl sm:text-3xl font-bold step-number">04</div>
+            <h3 className="font-medium text-xs sm:text-sm">Results</h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+              Get your slop score, similarity matches, redaction summary, and feedback.
             </p>
           </div>
         </div>
@@ -622,39 +622,39 @@ function RecentReportsFeed() {
   }
 
   return (
-    <div className="glass-card rounded-xl p-6 space-y-4">
+    <div className="glass-card rounded-xl p-4 sm:p-6 space-y-3 sm:space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold flex items-center gap-2">
-          <Clock className="w-5 h-5 text-primary" />
+        <h2 className="text-base sm:text-lg font-bold flex items-center gap-2">
+          <Clock className="w-4 sm:w-5 h-4 sm:h-5 text-primary" />
           Recent Reports
         </h2>
-        <span className="text-xs text-muted-foreground">{reports.length} report{reports.length !== 1 ? "s" : ""} in feed</span>
+        <span className="text-[10px] sm:text-xs text-muted-foreground">{reports.length} report{reports.length !== 1 ? "s" : ""}</span>
       </div>
       <div className="space-y-2">
         {reports.map((report) => (
           <Link
             key={report.id}
             to={`/verify/${report.id}`}
-            className="flex items-center justify-between p-3 rounded-lg glass-card hover:border-primary/20 transition-all group"
+            className="flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-lg glass-card hover:border-primary/20 transition-all group"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="font-mono text-sm text-primary font-medium glow-text-sm">{report.reportCode}</span>
-              <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="font-mono text-xs sm:text-sm text-primary font-medium glow-text-sm truncate">{report.reportCode}</span>
+              <Badge variant="secondary" className="text-[10px] hidden md:inline-flex">
                 {report.contentMode === "full" ? "Shared" : "Private"}
               </Badge>
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Progress value={report.slopScore} className="w-16 h-1.5 hidden sm:block" indicatorClassName={getSlopProgressColor(report.slopScore)} />
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Progress value={report.slopScore} className="w-12 sm:w-16 h-1.5 hidden sm:block" indicatorClassName={getSlopProgressColor(report.slopScore)} />
                 <span className={cn("font-mono text-xs font-medium w-6 text-right", getSlopColor(report.slopScore))}>{report.slopScore}</span>
               </div>
               {report.matchCount > 0 && (
-                <Badge variant="outline" className="text-[10px] gap-1">
+                <Badge variant="outline" className="text-[10px] gap-1 hidden sm:inline-flex">
                   <Search className="w-2.5 h-2.5" />{report.matchCount}
                 </Badge>
               )}
-              <span className="text-[10px] text-muted-foreground w-14 text-right">{timeAgo(report.createdAt)}</span>
-              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors" />
+              <span className="text-[10px] text-muted-foreground w-10 sm:w-14 text-right">{timeAgo(report.createdAt)}</span>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors hidden sm:block" />
             </div>
           </Link>
         ))}

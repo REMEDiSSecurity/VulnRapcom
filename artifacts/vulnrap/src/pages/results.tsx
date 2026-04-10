@@ -146,11 +146,11 @@ export default function Results() {
   const redactionSummary = report.redactionSummary as { totalRedactions: number; categories: Record<string, number> } | undefined;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6">
+    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 sm:pb-6">
         <div>
-          <h1 className="text-3xl font-bold uppercase tracking-tight flex items-center gap-2 glow-text">
-            <FileText className="w-8 h-8 text-primary" />
+          <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-tight flex items-center gap-2 glow-text">
+            <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-primary shrink-0" />
             Analysis Results
           </h1>
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
