@@ -93,7 +93,7 @@ export default function Privacy() {
               Redacted items are replaced with tagged placeholders like <code className="text-primary text-xs bg-muted px-1 py-0.5 rounded">[REDACTED_EMAIL]</code> or <code className="text-primary text-xs bg-muted px-1 py-0.5 rounded">[REDACTED_API_KEY]</code>. Your results page shows a breakdown of exactly what was redacted and how many of each type.
             </p>
             <p className="text-xs italic">
-              Auto-redaction is regex-based and deterministic. It may not catch every possible sensitive value. Do not rely on it as your only protection -- if your report contains highly sensitive information, review it before uploading.
+              Auto-redaction is regex-based and deterministic. It may not catch every possible sensitive value. Do not rely on it as your only protection -- if your report contains highly sensitive information, <strong className="text-yellow-500 not-italic">pre-sanitize it yourself</strong> before uploading. Remove or replace any details you would not want stored, even in redacted form.
             </p>
           </CardContent>
         </Card>

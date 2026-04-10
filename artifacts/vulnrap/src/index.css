@@ -66,9 +66,10 @@
 }
 
 :root {
-  --app-font-sans: "Space Mono", monospace;
+  --app-font-sans: "Inter", "Space Grotesk", system-ui, sans-serif;
   --app-font-serif: Georgia, serif;
-  --app-font-mono: "Space Mono", monospace;
+  --app-font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --app-font-heading: "Space Grotesk", "Inter", system-ui, sans-serif;
 
   /* Always Dark Theme for a Security Tool */
   --button-outline: rgba(255,255,255, .10);
@@ -182,9 +183,15 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     color-scheme: dark;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--app-font-heading);
   }
 }
 

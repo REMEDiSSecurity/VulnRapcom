@@ -271,6 +271,9 @@ export default function Home() {
           <CardDescription>Upload a file or paste text directly (Max 20MB)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
+            <strong className="text-yellow-500">Heads up:</strong> We auto-redact PII, secrets, credentials, and company names before storing or comparing your report. But auto-redaction is regex-based and may miss edge cases. If your report contains specific details you want kept private, pre-sanitize those sections yourself before uploading.
+          </div>
           <div className="flex rounded-xl overflow-hidden glass-card">
             <button
               type="button"

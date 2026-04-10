@@ -133,7 +133,7 @@ export default function Check() {
           Check a Report
         </h1>
         <p className="text-muted-foreground max-w-2xl">
-          For bug bounty programs and report receivers. Check an incoming vulnerability report against our database for duplicates and AI-generated content. Nothing is stored -- this is a read-only check.
+          For bug bounty programs and report receivers. Check an incoming vulnerability report against our database for duplicates and AI-generated content. Your report is auto-redacted during analysis but nothing is stored afterward.
         </p>
         <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent mt-4" />
       </div>
@@ -145,9 +145,12 @@ export default function Check() {
             Paste or Upload the Report
             <Hint text="This check runs the full analysis pipeline (redaction, similarity, slop scoring) but does NOT store the report in our database. Use this to validate incoming reports without contributing to the corpus." />
           </CardTitle>
-          <CardDescription>Analysis only -- nothing is stored or saved</CardDescription>
+          <CardDescription>Auto-redacted during analysis, then discarded -- nothing is saved</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-4 py-3 text-xs text-muted-foreground leading-relaxed">
+            <strong className="text-yellow-500">Pre-sanitize if you can.</strong> Our auto-redaction catches most PII, secrets, and company names, but it is regex-based and not perfect. If your report contains information you would prefer not to share even temporarily during analysis, redact it yourself before pasting or uploading.
+          </div>
           <div className="flex rounded-xl overflow-hidden glass-card">
             <button
               type="button"

@@ -8,7 +8,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
 
   return (
-    <div className="laser-content-layer min-h-screen bg-background text-foreground flex flex-col font-mono selection:bg-primary selection:text-primary-foreground">
+    <div className="laser-content-layer min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
       <div className="cyber-grid" aria-hidden="true" />
       <LaserEffects />
       <header className="nav-glass sticky top-0 z-50">
