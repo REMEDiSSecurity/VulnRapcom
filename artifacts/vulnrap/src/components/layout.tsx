@@ -1,9 +1,17 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Shield, Search, Code, BookOpen, Target } from "lucide-react";
+import { Activity, Shield, Search, Code, BookOpen, Target, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoSrc from "@/assets/logo.png";
 import { LaserEffects } from "@/components/laser-effects";
 import { CursorBugs } from "@/components/cursor-bugs";
+
+function feedbackMailto(page: string) {
+  const subject = encodeURIComponent("VulnRap Feedback");
+  const body = encodeURIComponent(
+    `Hi VulnRap team,\n\nI wanted to share some feedback:\n\n[Your feedback here]\n\n---\nPage: ${page}`
+  );
+  return `mailto:remedisllc@gmail.com?subject=${subject}&body=${body}`;
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
@@ -65,6 +73,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link to="/stats" className="hover:text-primary transition-colors">Stats</Link>
             </div>
           </div>
+          <div className="w-16 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          <a
+            href={`mailto:remedisllc@gmail.com?subject=${encodeURIComponent("VulnRap Feedback")}&body=${encodeURIComponent("Hi VulnRap team,\n\nI wanted to share some feedback:\n\n[Your feedback here]\n\n---\nSent from " + window.location.href)}`}
+            className="inline-flex items-center gap-1.5 text-muted-foreground/50 hover:text-primary transition-colors group"
+          >
+            <MessageSquare className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
+            <span>Send us feedback</span>
+          </a>
           <div className="w-16 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <span className="text-[10px] text-muted-foreground/30">Funded and developed by the creators of <a href="https://complitt.com" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground/50 transition-colors">COMPLiTT.com</a> and <a href="https://remedissecurity.com" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground/50 transition-colors">REMEDiSSecurity.com</a></span>
         </div>
