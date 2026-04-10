@@ -75,7 +75,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="w-16 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <a
-            href={`mailto:remedisllc@gmail.com?subject=${encodeURIComponent("VulnRap Feedback")}&body=${encodeURIComponent("Hi VulnRap team,\n\nI wanted to share some feedback:\n\n[Your feedback here]\n\n---\nSent from " + window.location.href)}`}
+            href={feedbackMailto(pathname)}
             className="inline-flex items-center gap-1.5 text-muted-foreground/50 hover:text-primary transition-colors group"
           >
             <MessageSquare className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
