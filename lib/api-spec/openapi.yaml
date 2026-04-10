@@ -54,6 +54,11 @@ paths:
                   enum: [full, similarity_only]
                   default: full
                   description: Privacy mode — full shares content, similarity_only stores only hashes
+                showInFeed:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Whether to show this report in the public recent reports feed
               required:
                 - contentMode
       responses:
@@ -191,6 +196,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HashLookupResult"
+
+  /reports/feed:
+    get:
+      operationId: getReportFeed
+      tags: [reports]
+      summary: Get recent public reports
+      description: Returns recent reports that submitters opted to show in the public feed
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Recent public reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportFeed"
 
   /stats:
     get:
@@ -513,6 +541,41 @@ components:
               - createdAt
       required:
         - recentReports
+
+    ReportFeed:
+      type: object
+      properties:
+        reports:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              reportCode:
+                type: string
+              slopScore:
+                type: integer
+              slopTier:
+                type: string
+              matchCount:
+                type: integer
+              contentMode:
+                type: string
+                enum: [full, similarity_only]
+              createdAt:
+                type: string
+                format: date-time
+            required:
+              - id
+              - reportCode
+              - slopScore
+              - slopTier
+              - matchCount
+              - contentMode
+              - createdAt
+      required:
+        - reports
 
     SlopDistribution:
       type: object

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { SubmitReportBodyContentMode } from "./submitReportBodyContentMode";
+import type { SubmitReportBodyShowInFeed } from "./submitReportBodyShowInFeed";
 
 export type SubmitReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf). Either file or rawText must be provided. */
@@ -14,4 +15,6 @@ export type SubmitReportBody = {
   rawText?: string;
   /** Privacy mode — full shares content, similarity_only stores only hashes */
   contentMode: SubmitReportBodyContentMode;
+  /** Whether to show this report in the public recent reports feed */
+  showInFeed?: SubmitReportBodyShowInFeed;
 };

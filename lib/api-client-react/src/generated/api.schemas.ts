@@ -156,6 +156,28 @@ export interface RecentActivity {
   recentReports: RecentActivityRecentReportsItem[];
 }
 
+export type ReportFeedReportsItemContentMode =
+  (typeof ReportFeedReportsItemContentMode)[keyof typeof ReportFeedReportsItemContentMode];
+
+export const ReportFeedReportsItemContentMode = {
+  full: "full",
+  similarity_only: "similarity_only",
+} as const;
+
+export type ReportFeedReportsItem = {
+  id: number;
+  reportCode: string;
+  slopScore: number;
+  slopTier: string;
+  matchCount: number;
+  contentMode: ReportFeedReportsItemContentMode;
+  createdAt: string;
+};
+
+export interface ReportFeed {
+  reports: ReportFeedReportsItem[];
+}
+
 export type SlopDistributionBucketsItem = {
   label: string;
   min: number;
@@ -179,6 +201,17 @@ export const SubmitReportBodyContentMode = {
   similarity_only: "similarity_only",
 } as const;
 
+/**
+ * Whether to show this report in the public recent reports feed
+ */
+export type SubmitReportBodyShowInFeed =
+  (typeof SubmitReportBodyShowInFeed)[keyof typeof SubmitReportBodyShowInFeed];
+
+export const SubmitReportBodyShowInFeed = {
+  true: "true",
+  false: "false",
+} as const;
+
 export type SubmitReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf). Either file or rawText must be provided. */
   file?: Blob;
@@ -186,6 +219,8 @@ export type SubmitReportBody = {
   rawText?: string;
   /** Privacy mode — full shares content, similarity_only stores only hashes */
   contentMode: SubmitReportBodyContentMode;
+  /** Whether to show this report in the public recent reports feed */
+  showInFeed?: SubmitReportBodyShowInFeed;
 };
 
 export type CheckReportBody = {
@@ -193,4 +228,12 @@ export type CheckReportBody = {
   file?: Blob;
   /** Plain text content of the vulnerability report */
   rawText?: string;
+};
+
+export type GetReportFeedParams = {
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
 };

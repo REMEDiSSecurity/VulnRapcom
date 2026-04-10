@@ -11,6 +11,7 @@ import {
   CheckReportResponse,
   LookupByHashParams,
   LookupByHashResponse,
+  GetReportFeedResponse,
 } from "@workspace/api-zod";
 import { computeMinHash, computeSimhash, computeContentHash, computeLSHBuckets, findSimilarReports } from "../lib/similarity";
 import { analyzeSloppiness } from "../lib/sloppiness";
@@ -60,6 +61,7 @@ router.post("/reports", async (req, res): Promise<void> => {
   const contentMode = (req.body.contentMode === "full" || req.body.contentMode === "similarity_only")
     ? req.body.contentMode
     : "full";
+  const showInFeed = req.body.showInFeed === "true";
 
   let text: string;
   let safeFileName: string | null = null;
@@ -151,6 +153,7 @@ router.post("/reports", async (req, res): Promise<void> => {
       sectionMatches,
       redactionSummary,
       feedback: analysis.feedback,
+      showInFeed,
       fileName: safeFileName,
       fileSize: rawFileSize,
     })
@@ -308,6 +311,41 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     existingReportId: existingReport?.id ?? null,
   });
 
+  res.json(response);
+});
+
+router.get("/reports/feed", async (req, res): Promise<void> => {
+  const limitParam = parseInt(String(req.query.limit || "10"), 10);
+  const limit = Math.max(1, Math.min(50, isNaN(limitParam) ? 10 : limitParam));
+
+  const feedReports = await db
+    .select({
+      id: reportsTable.id,
+      slopScore: reportsTable.slopScore,
+      slopTier: reportsTable.slopTier,
+      similarityMatches: reportsTable.similarityMatches,
+      contentMode: reportsTable.contentMode,
+      createdAt: reportsTable.createdAt,
+    })
+    .from(reportsTable)
+    .where(eq(reportsTable.showInFeed, true))
+    .orderBy(sql`${reportsTable.createdAt} desc`)
+    .limit(limit);
+
+  const mapped = feedReports.map((r) => {
+    const matches = r.similarityMatches as Array<{ reportId: number }>;
+    return {
+      id: r.id,
+      reportCode: anonymizeId(r.id),
+      slopScore: r.slopScore,
+      slopTier: r.slopTier,
+      matchCount: matches.length,
+      contentMode: r.contentMode,
+      createdAt: r.createdAt,
+    };
+  });
+
+  const response = GetReportFeedResponse.parse({ reports: mapped });
   res.json(response);
 });
 

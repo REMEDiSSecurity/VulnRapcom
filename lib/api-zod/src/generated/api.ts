@@ -20,6 +20,7 @@ export const HealthCheckResponse = zod.object({
  * @summary Submit a vulnerability report for analysis
  */
 export const submitReportBodyContentModeDefault = `full`;
+export const submitReportBodyShowInFeedDefault = `false`;
 
 export const SubmitReportBody = zod.object({
   file: zod
@@ -40,6 +41,10 @@ export const SubmitReportBody = zod.object({
     .describe(
       "Privacy mode — full shares content, similarity_only stores only hashes",
     ),
+  showInFeed: zod
+    .enum(["true", "false"])
+    .default(submitReportBodyShowInFeedDefault)
+    .describe("Whether to show this report in the public recent reports feed"),
 });
 
 /**
@@ -196,6 +201,35 @@ export const LookupByHashResponse = zod.object({
   slopTier: zod.string().nullish(),
   matchCount: zod.number().describe("Number of similar reports found"),
   firstSeen: zod.coerce.date().nullish(),
+});
+
+/**
+ * Returns recent reports that submitters opted to show in the public feed
+ * @summary Get recent public reports
+ */
+export const getReportFeedQueryLimitDefault = 10;
+export const getReportFeedQueryLimitMax = 50;
+
+export const GetReportFeedQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getReportFeedQueryLimitMax)
+    .default(getReportFeedQueryLimitDefault),
+});
+
+export const GetReportFeedResponse = zod.object({
+  reports: zod.array(
+    zod.object({
+      id: zod.number(),
+      reportCode: zod.string(),
+      slopScore: zod.number(),
+      slopTier: zod.string(),
+      matchCount: zod.number(),
+      contentMode: zod.enum(["full", "similarity_only"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
 });
 
 /**

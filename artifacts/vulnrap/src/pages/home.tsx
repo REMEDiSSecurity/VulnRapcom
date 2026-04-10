@@ -1,11 +1,14 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste } from "lucide-react";
-import { useSubmitReport, SubmitReportBodyContentMode } from "@workspace/api-client-react";
+import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink } from "lucide-react";
+import { LogoBeams } from "@/components/laser-effects";
+import { useSubmitReport, SubmitReportBodyContentMode, useGetReportFeed } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import logoSrc from "@/assets/logo.png";
@@ -13,6 +16,36 @@ import logoSrc from "@/assets/logo.png";
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_TEXT_LENGTH = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".md"];
+
+function anonymizeId(id: number): string {
+  return `VR-${id.toString(16).padStart(4, "0").toUpperCase()}`;
+}
+
+function getSlopColor(score: number) {
+  if (score < 30) return "text-green-500";
+  if (score < 70) return "text-yellow-500";
+  return "text-destructive";
+}
+
+function getSlopProgressColor(score: number) {
+  if (score < 30) return "bg-green-500";
+  if (score < 70) return "bg-yellow-500";
+  return "bg-destructive";
+}
+
+function timeAgo(date: string): string {
+  const now = Date.now();
+  const then = new Date(date).getTime();
+  const seconds = Math.floor((now - then) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(date).toLocaleDateString();
+}
 
 type InputMode = "file" | "text";
 type UploadStage = "idle" | "uploading" | "analyzing" | "done" | "error";
@@ -50,7 +83,8 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [rawText, setRawText] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
-  const [mode, setMode] = useState<SubmitReportBodyContentMode>(SubmitReportBodyContentMode.similarity_only);
+  const [mode, setMode] = useState<SubmitReportBodyContentMode>(SubmitReportBodyContentMode.full);
+  const [showInFeed, setShowInFeed] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [stage, setStage] = useState<UploadStage>("idle");
@@ -136,7 +170,7 @@ export default function Home() {
         toast({ title: "Invalid file", description: error, variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { file, contentMode: mode } });
+      submitMutation.mutate({ data: { file, contentMode: mode, showInFeed: (mode === "full" && showInFeed) ? "true" : "false" } });
     } else {
       const trimmed = rawText.trim();
       if (trimmed.length === 0) {
@@ -147,7 +181,7 @@ export default function Home() {
         toast({ title: "Text too large", description: "Pasted text exceeds the 20MB limit.", variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { rawText: trimmed, contentMode: mode } });
+      submitMutation.mutate({ data: { rawText: trimmed, contentMode: mode, showInFeed: (mode === "full" && showInFeed) ? "true" : "false" } });
     }
   };
 
@@ -172,8 +206,11 @@ export default function Home() {
   return (
     <div className="max-w-4xl mx-auto space-y-10">
       <div className="space-y-5 text-center pt-4">
-        <div className="flex justify-center">
-          <img src={logoSrc} alt="VulnRap" className="w-20 h-20 md:w-24 md:h-24 rounded-lg shadow-lg shadow-primary/20 border border-primary/20" />
+        <div className="relative flex justify-center">
+          <div className="relative">
+            <LogoBeams />
+            <img src={logoSrc} alt="VulnRap" className="relative z-10 w-20 h-20 md:w-24 md:h-24 rounded-lg shadow-lg shadow-primary/20 border border-primary/20" />
+          </div>
         </div>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary uppercase" data-testid="text-heading">Report Validation</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -350,25 +387,35 @@ export default function Home() {
           <div className="space-y-4">
             <h3 className="font-medium flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
-              Privacy Mode
-              <Explainer text="Choose how your report data is handled after analysis. This controls whether we retain the original text or only store mathematical fingerprints." />
+              How should we handle your report?
             </h3>
-            <RadioGroup value={mode} onValueChange={(v) => setMode(v as SubmitReportBodyContentMode)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className={cn("border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors", mode === "similarity_only" ? "border-primary bg-primary/5" : "border-border")} onClick={() => setMode(SubmitReportBodyContentMode.similarity_only)}>
-                <div className="flex items-start gap-3">
-                  <RadioGroupItem value={SubmitReportBodyContentMode.similarity_only} id="similarity_only" className="mt-1" />
-                  <div className="space-y-1">
-                    <Label htmlFor="similarity_only" className="font-medium cursor-pointer">Similarity Only</Label>
-                    <p className="text-xs text-muted-foreground leading-relaxed">Report is auto-redacted then hashed. Only hashes are stored -- no text, not even the redacted version. Best for sensitive zero-days.</p>
-                  </div>
-                </div>
-              </div>
+            <RadioGroup value={mode} onValueChange={(v) => { setMode(v as SubmitReportBodyContentMode); if (v === "similarity_only") setShowInFeed(false); }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className={cn("border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors", mode === "full" ? "border-primary bg-primary/5" : "border-border")} onClick={() => setMode(SubmitReportBodyContentMode.full)}>
                 <div className="flex items-start gap-3">
                   <RadioGroupItem value={SubmitReportBodyContentMode.full} id="full" className="mt-1" />
                   <div className="space-y-1">
-                    <Label htmlFor="full" className="font-medium cursor-pointer">Full Storage</Label>
-                    <p className="text-xs text-muted-foreground leading-relaxed">Stores the auto-redacted version (PII/secrets removed) for richer comparison. Contributes to the community corpus. Recommended for disclosed bugs.</p>
+                    <Label htmlFor="full" className="font-bold cursor-pointer">Share with the community</Label>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Your report (with PII and secrets auto-removed) is saved and helps everyone detect duplicates. Best for most submissions.</p>
+                  </div>
+                </div>
+                {mode === "full" && (
+                  <label className="flex items-center gap-2 mt-3 ml-7 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={showInFeed}
+                      onChange={(e) => setShowInFeed(e.target.checked)}
+                      className="rounded border-border accent-primary w-4 h-4"
+                    />
+                    <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Show in the recent reports feed on this site</span>
+                  </label>
+                )}
+              </div>
+              <div className={cn("border rounded-lg p-4 cursor-pointer hover:border-primary/50 transition-colors", mode === "similarity_only" ? "border-primary bg-primary/5" : "border-border")} onClick={() => { setMode(SubmitReportBodyContentMode.similarity_only); setShowInFeed(false); }}>
+                <div className="flex items-start gap-3">
+                  <RadioGroupItem value={SubmitReportBodyContentMode.similarity_only} id="similarity_only" className="mt-1" />
+                  <div className="space-y-1">
+                    <Label htmlFor="similarity_only" className="font-bold cursor-pointer">Keep it private</Label>
+                    <p className="text-xs text-muted-foreground leading-relaxed">We only store a mathematical fingerprint of your report -- no text is saved at all. Use this for sensitive zero-days you want to keep confidential.</p>
                   </div>
                 </div>
               </div>
@@ -425,6 +472,84 @@ export default function Home() {
             </p>
           </div>
         </div>
+      </div>
+
+      <RecentReportsFeed />
+    </div>
+  );
+}
+
+function RecentReportsFeed() {
+  const { data, isLoading } = useGetReportFeed({ limit: 10 });
+  const reports = (data as unknown as { reports: Array<{ id: number; reportCode: string; slopScore: number; slopTier: string; matchCount: number; contentMode: string; createdAt: string }> })?.reports;
+
+  if (isLoading) {
+    return (
+      <div className="border border-border/50 rounded-lg p-6 bg-card/20 space-y-4">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary" />
+          Recent Reports
+        </h2>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-lg bg-muted/30 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!reports || reports.length === 0) {
+    return (
+      <div className="border border-border/50 rounded-lg p-6 bg-card/20 space-y-4">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary" />
+          Recent Reports
+        </h2>
+        <p className="text-sm text-muted-foreground text-center py-6">
+          No public reports yet. Be the first to share one with the community.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-border/50 rounded-lg p-6 bg-card/20 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Clock className="w-5 h-5 text-primary" />
+          Recent Reports
+        </h2>
+        <span className="text-xs text-muted-foreground">{reports.length} report{reports.length !== 1 ? "s" : ""} in feed</span>
+      </div>
+      <div className="space-y-2">
+        {reports.map((report) => (
+          <Link
+            key={report.id}
+            to={`/verify/${report.id}`}
+            className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/30 hover:border-primary/50 hover:bg-card/60 transition-all group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="font-mono text-sm text-primary font-medium">{report.reportCode}</span>
+              <Badge variant="secondary" className="text-[10px] hidden sm:inline-flex">
+                {report.contentMode === "full" ? "Shared" : "Private"}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Progress value={report.slopScore} className="w-16 h-1.5 hidden sm:block" indicatorClassName={getSlopProgressColor(report.slopScore)} />
+                <span className={cn("font-mono text-xs font-medium w-6 text-right", getSlopColor(report.slopScore))}>{report.slopScore}</span>
+              </div>
+              {report.matchCount > 0 && (
+                <Badge variant="outline" className="text-[10px] gap-1">
+                  <Search className="w-2.5 h-2.5" />{report.matchCount}
+                </Badge>
+              )}
+              <span className="text-[10px] text-muted-foreground w-14 text-right">{timeAgo(report.createdAt)}</span>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors" />
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, jsonb, index, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb, index, varchar, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -23,6 +23,7 @@ export const reportsTable = pgTable("reports", {
   sectionMatches: jsonb("section_matches").$type<SectionMatch[]>().default([]),
   redactionSummary: jsonb("redaction_summary").$type<RedactionSummary>().default({ totalRedactions: 0, categories: {} }),
   feedback: jsonb("feedback").notNull().$type<string[]>().default([]),
+  showInFeed: boolean("show_in_feed").notNull().default(false),
   fileName: varchar("file_name", { length: 255 }),
   fileSize: integer("file_size").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

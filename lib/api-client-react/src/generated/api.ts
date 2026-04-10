@@ -20,11 +20,13 @@ import type {
   CheckReportBody,
   CheckResult,
   ErrorResponse,
+  GetReportFeedParams,
   HashLookupResult,
   HealthStatus,
   PlatformStats,
   RecentActivity,
   ReportAnalysis,
+  ReportFeed,
   SlopDistribution,
   SubmitReportBody,
   VerificationBadge,
@@ -135,6 +137,9 @@ export const submitReport = async (
     formData.append(`rawText`, submitReportBody.rawText);
   }
   formData.append(`contentMode`, submitReportBody.contentMode);
+  if (submitReportBody.showInFeed !== undefined) {
+    formData.append(`showInFeed`, submitReportBody.showInFeed);
+  }
 
   return customFetch<ReportAnalysis>(getSubmitReportUrl(), {
     ...options,
@@ -558,6 +563,101 @@ export function useLookupByHash<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getLookupByHashQueryOptions(hash, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns recent reports that submitters opted to show in the public feed
+ * @summary Get recent public reports
+ */
+export const getGetReportFeedUrl = (params?: GetReportFeedParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/reports/feed?${stringifiedParams}`
+    : `/api/reports/feed`;
+};
+
+export const getReportFeed = async (
+  params?: GetReportFeedParams,
+  options?: RequestInit,
+): Promise<ReportFeed> => {
+  return customFetch<ReportFeed>(getGetReportFeedUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetReportFeedQueryKey = (params?: GetReportFeedParams) => {
+  return [`/api/reports/feed`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetReportFeedQueryOptions = <
+  TData = Awaited<ReturnType<typeof getReportFeed>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetReportFeedParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportFeed>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetReportFeedQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportFeed>>> = ({
+    signal,
+  }) => getReportFeed(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getReportFeed>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetReportFeedQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getReportFeed>>
+>;
+export type GetReportFeedQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get recent public reports
+ */
+
+export function useGetReportFeed<
+  TData = Awaited<ReturnType<typeof getReportFeed>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetReportFeedParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getReportFeed>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetReportFeedQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

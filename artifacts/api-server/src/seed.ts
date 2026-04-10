@@ -333,6 +333,7 @@ async function seed() {
         sectionMatches,
         redactionSummary,
         feedback: analysis.feedback,
+        showInFeed: true,
         fileName: seedReport.fileName,
         fileSize: Buffer.byteLength(seedReport.content, "utf-8"),
       })
