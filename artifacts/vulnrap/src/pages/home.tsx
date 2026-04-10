@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useSubmitReport, SubmitReportBodyContentMode } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".txt", ".md", ".pdf"];
+const ALLOWED_EXTENSIONS = [".txt", ".md"];
 
 type UploadStage = "idle" | "uploading" | "analyzing" | "done" | "error";
 
@@ -18,7 +18,7 @@ function validateFile(file: File): string | null {
   const ext = file.name.toLowerCase();
   const hasValidExt = ALLOWED_EXTENSIONS.some(e => ext.endsWith(e));
   if (!hasValidExt) {
-    return `Unsupported file type. Accepted formats: ${ALLOWED_EXTENSIONS.join(", ")}`;
+    return `Unsupported file type. Accepted formats: ${ALLOWED_EXTENSIONS.join(", ")}`;  
   }
   if (file.size > MAX_FILE_SIZE) {
     return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 20MB.`;
@@ -30,7 +30,7 @@ function validateFile(file: File): string | null {
 }
 
 export default function Home() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function Home() {
       onSuccess: (data) => {
         setStage("done");
         toast({ title: "Analysis complete", description: "Navigating to results..." });
-        setTimeout(() => setLocation(`/results/${data.id}`), 600);
+        setTimeout(() => navigate(`/results/${data.id}`), 600);
       },
       onError: (err: unknown) => {
         setStage("error");
@@ -144,7 +144,7 @@ export default function Home() {
             <UploadCloud className="w-5 h-5 text-primary" />
             Upload Report
           </CardTitle>
-          <CardDescription>Supported formats: .txt, .md, .pdf (Max 20MB)</CardDescription>
+          <CardDescription>Supported formats: .txt, .md (Max 20MB)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8">
           <div
@@ -164,7 +164,7 @@ export default function Home() {
               type="file"
               ref={fileInputRef}
               className="hidden"
-              accept=".txt,.md,.pdf"
+              accept=".txt,.md"
               onChange={handleFileChange}
               data-testid="input-file"
             />

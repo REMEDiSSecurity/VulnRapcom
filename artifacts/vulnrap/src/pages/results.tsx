@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams } from "react-router-dom";
 import { useGetReport, getGetReportQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

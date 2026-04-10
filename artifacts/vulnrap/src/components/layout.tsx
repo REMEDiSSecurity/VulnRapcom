@@ -1,26 +1,26 @@
-import { Link, useLocation } from "wouter";
-import { Terminal, Activity, Shield, Info } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Terminal, Activity, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const { pathname } = useLocation();
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-mono selection:bg-primary selection:text-primary-foreground">
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
+          <Link to="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
             <Terminal className="w-6 h-6" />
             <span className="font-bold text-xl tracking-tight uppercase">VulnRap</span>
           </Link>
           <nav className="flex items-center gap-6">
-            <Link href="/" className={cn("text-sm font-medium transition-colors hover:text-primary", location === "/" ? "text-primary" : "text-muted-foreground")}>
+            <Link to="/" className={cn("text-sm font-medium transition-colors hover:text-primary", pathname === "/" ? "text-primary" : "text-muted-foreground")}>
               Analyze
             </Link>
-            <Link href="/stats" className={cn("text-sm font-medium transition-colors hover:text-primary flex items-center gap-1", location === "/stats" ? "text-primary" : "text-muted-foreground")}>
+            <Link to="/stats" className={cn("text-sm font-medium transition-colors hover:text-primary flex items-center gap-1", pathname === "/stats" ? "text-primary" : "text-muted-foreground")}>
               <Activity className="w-4 h-4" /> Stats
             </Link>
-            <Link href="/privacy" className={cn("text-sm font-medium transition-colors hover:text-primary flex items-center gap-1", location === "/privacy" ? "text-primary" : "text-muted-foreground")}>
+            <Link to="/privacy" className={cn("text-sm font-medium transition-colors hover:text-primary flex items-center gap-1", pathname === "/privacy" ? "text-primary" : "text-muted-foreground")}>
               <Shield className="w-4 h-4" /> Privacy
             </Link>
           </nav>
@@ -36,8 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span>VulnRap Platform // Anonymous Validation</span>
           </div>
           <div className="flex gap-4">
-            <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-            <a href="#" className="hover:text-primary transition-colors">API Docs</a>
+            <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
           </div>
         </div>
       </footer>

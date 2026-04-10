@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, BarChart3, Database, ShieldAlert, Users } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 
 export default function Stats() {
   const { data: stats, isLoading: statsLoading } = useGetStats({ query: { queryKey: getGetStatsQueryKey() } });
@@ -128,7 +128,7 @@ export default function Stats() {
             ) : activity?.recentReports && activity.recentReports.length > 0 ? (
               <div className="space-y-4">
                 {activity.recentReports.map((report) => (
-                  <Link key={report.id} href={`/results/${report.id}`} className="block">
+                  <Link key={report.id} to={`/results/${report.id}`} className="block">
                     <div className="p-3 border border-border/50 rounded-lg hover:border-primary/50 hover:bg-muted/30 transition-colors">
                       <div className="flex justify-between items-start mb-2">
                         <div className="font-mono text-sm text-primary">#{report.id}</div>
