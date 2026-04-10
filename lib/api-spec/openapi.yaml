@@ -119,6 +119,7 @@ paths:
           schema:
             type: string
             minLength: 64
+            pattern: "^[a-fA-F0-9]{64}$"
             maxLength: 64
       responses:
         "200":

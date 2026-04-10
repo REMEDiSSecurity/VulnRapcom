@@ -74,11 +74,14 @@ export const GetReportResponse = zod.object({
 export const lookupByHashPathHashMin = 64;
 export const lookupByHashPathHashMax = 64;
 
+export const lookupByHashPathHashRegExp = new RegExp("^[a-fA-F0-9]{64}$");
+
 export const LookupByHashParams = zod.object({
   hash: zod.coerce
     .string()
     .min(lookupByHashPathHashMin)
-    .max(lookupByHashPathHashMax),
+    .max(lookupByHashPathHashMax)
+    .regex(lookupByHashPathHashRegExp),
 });
 
 export const LookupByHashResponse = zod.object({

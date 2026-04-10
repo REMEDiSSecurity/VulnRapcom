@@ -45,15 +45,17 @@ const replitDevDomain = process.env.REPLIT_DEV_DOMAIN
 const allOrigins = [...allowedOrigins, ...replitDomains, ...replitDevDomain];
 
 app.use(cors({
-  origin: allOrigins.length > 0
-    ? (origin, callback) => {
-        if (!origin || allOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(null, false);
-        }
-      }
-    : true,
+  origin: (origin, callback) => {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    if (allOrigins.length === 0 || allOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"],
   maxAge: 86400,
