@@ -242,6 +242,99 @@ curl -X POST https://vulnrap.com/api/reports/check \\
         </CardContent>
       </Card>
 
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
+          <FileText className="w-5 h-5 text-primary" />
+          Example Scripts
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Copy-paste scripts you can drop into your workflow:
+        </p>
+
+        <Card className="glass-card rounded-xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Badge variant="outline" className="border-yellow-500 text-yellow-500 text-[10px] font-mono uppercase">Python</Badge>
+              Batch-check a folder of reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CopyBlock language="python" code={`import requests, pathlib, json
+
+reports_dir = pathlib.Path("./reports")
+for f in reports_dir.glob("*.txt"):
+    r = requests.post("https://vulnrap.com/api/reports/check",
+                       files={"file": open(f, "rb")})
+    data = r.json()
+    score = data.get("slopScore", "?")
+    dupes = len(data.get("similarityMatches", []))
+    print(f"{f.name}: slop={score}, duplicates={dupes}")`} />
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card rounded-xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Badge variant="outline" className="border-green-500 text-green-500 text-[10px] font-mono uppercase">Bash</Badge>
+              CI/CD gate — fail pipeline if slop score is too high
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CopyBlock language="bash" code={`#!/bin/bash
+# Add to your CI pipeline to reject AI-generated reports
+REPORT_FILE="$1"
+THRESHOLD=50
+
+RESULT=$(curl -s -X POST https://vulnrap.com/api/reports/check \\
+  -F "file=@$REPORT_FILE")
+
+SCORE=$(echo "$RESULT" | jq '.slopScore')
+echo "Slop score: $SCORE / 100"
+
+if [ "$SCORE" -gt "$THRESHOLD" ]; then
+  echo "FAILED: Report exceeds slop threshold ($THRESHOLD)"
+  exit 1
+fi
+echo "PASSED: Report looks human-written"`} />
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card rounded-xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Badge variant="outline" className="border-blue-500 text-blue-500 text-[10px] font-mono uppercase">Node.js</Badge>
+              Slack bot — post analysis results to a channel
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CopyBlock language="javascript" code={`const FormData = require("form-data");
+const axios = require("axios");
+const fs = require("fs");
+
+async function analyzeAndPost(filePath, slackWebhook) {
+  const form = new FormData();
+  form.append("file", fs.createReadStream(filePath));
+
+  const { data } = await axios.post(
+    "https://vulnrap.com/api/reports/check",
+    form, { headers: form.getHeaders() }
+  );
+
+  const emoji = data.slopScore < 30 ? ":white_check_mark:"
+    : data.slopScore < 70 ? ":warning:" : ":x:";
+  const dupes = data.similarityMatches?.length || 0;
+
+  await axios.post(slackWebhook, {
+    text: \`\${emoji} *VulnRap Analysis*\\n\`
+      + \`Slop Score: \${data.slopScore}/100 (\${data.slopTier})\\n\`
+      + \`Similar Reports: \${dupes}\\n\`
+      + \`Redacted Items: \${data.redactionSummary?.total || 0}\`
+  });
+}`} />
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="text-center text-xs text-muted-foreground/50 pb-4">
         <a href={apiDocsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
           Full OpenAPI spec available at /api/docs

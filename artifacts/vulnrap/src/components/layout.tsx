@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Shield, Search, Code } from "lucide-react";
+import { Activity, Shield, Search, Code, BookOpen, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoSrc from "@/assets/logo.png";
 import { LaserEffects } from "@/components/laser-effects";
@@ -24,8 +24,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               { to: "/", label: "Submit", icon: null, match: pathname === "/" },
               { to: "/check", label: "Check", icon: <Search className="w-3.5 h-3.5" />, match: pathname === "/check" },
               { to: "/stats", label: "Stats", icon: <Activity className="w-3.5 h-3.5" />, match: pathname === "/stats" },
+              { to: "/use-cases", label: "Use Cases", icon: <Target className="w-3.5 h-3.5" />, match: pathname === "/use-cases" },
               { to: "/developers", label: "API", icon: <Code className="w-3.5 h-3.5" />, match: pathname === "/developers" },
-              { to: "/privacy", label: "Privacy", icon: <Shield className="w-3.5 h-3.5" />, match: pathname === "/privacy" },
+              { to: "/blog", label: "Blog", icon: <BookOpen className="w-3.5 h-3.5" />, match: pathname === "/blog" },
             ].map((item) => (
               <Link
                 key={item.to}
@@ -54,10 +55,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <img src={logoSrc} alt="" className="w-5 h-5 rounded-sm opacity-50" />
               <span className="text-muted-foreground/70">VulnRap // Free & Anonymous Vulnerability Report Validation — made by and for frustrated PSIRTlings</span>
             </div>
-            <div className="flex gap-5">
+            <div className="flex flex-wrap gap-x-5 gap-y-1 justify-center md:justify-end">
+              <Link to="/use-cases" className="hover:text-primary transition-colors">Use Cases</Link>
               <Link to="/developers" className="hover:text-primary transition-colors">API Docs</Link>
-              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-              <Link to="/stats" className="hover:text-primary transition-colors">Platform Stats</Link>
+              <Link to="/blog" className="hover:text-primary transition-colors">Blog</Link>
+              <Link to="/security" className="hover:text-primary transition-colors">Security</Link>
+              <Link to="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
+              <Link to="/stats" className="hover:text-primary transition-colors">Stats</Link>
             </div>
           </div>
           <div className="w-16 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
