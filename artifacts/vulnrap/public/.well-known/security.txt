@@ -1,0 +1,10 @@
+Contact: mailto:remedisllc@gmail.com
+Expires: 2027-12-31T23:59:00.000Z
+Preferred-Languages: en
+Canonical: https://vulnrap.com/.well-known/security.txt
+Policy: https://vulnrap.com/privacy
+
+# VulnRap Security Contact
+# If you discover a security vulnerability in VulnRap, please report it
+# responsibly to the contact above. We appreciate your help in keeping
+# this platform and its users safe.

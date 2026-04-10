@@ -103,6 +103,21 @@ if (swaggerDocument) {
   }));
 }
 
+const SECURITY_TXT = `Contact: mailto:remedisllc@gmail.com
+Expires: 2027-12-31T23:59:00.000Z
+Preferred-Languages: en
+Canonical: https://vulnrap.com/.well-known/security.txt
+Policy: https://vulnrap.com/privacy
+`;
+
+app.get("/.well-known/security.txt", (_req, res) => {
+  res.type("text/plain").send(SECURITY_TXT);
+});
+
+app.get("/security.txt", (_req, res) => {
+  res.type("text/plain").send(SECURITY_TXT);
+});
+
 app.use("/api", router);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
