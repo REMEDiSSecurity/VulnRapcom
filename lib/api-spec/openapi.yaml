@@ -205,6 +205,36 @@ components:
         - similarity
         - matchType
 
+    SectionMatchItem:
+      type: object
+      properties:
+        sectionTitle:
+          type: string
+        matchedReportId:
+          type: integer
+        matchedSectionTitle:
+          type: string
+        similarity:
+          type: integer
+      required:
+        - sectionTitle
+        - matchedReportId
+        - matchedSectionTitle
+        - similarity
+
+    RedactionSummary:
+      type: object
+      properties:
+        totalRedactions:
+          type: integer
+        categories:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - totalRedactions
+        - categories
+
     ReportAnalysis:
       type: object
       properties:
@@ -225,6 +255,21 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SimilarityMatch"
+        sectionHashes:
+          type: object
+          additionalProperties:
+            type: string
+          description: SHA-256 hashes of each report section for granular similarity
+        sectionMatches:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionMatchItem"
+          description: Sections that match existing reports
+        redactedText:
+          type: ["string", "null"]
+          description: Auto-redacted version of the report (PII/secrets removed)
+        redactionSummary:
+          $ref: "#/components/schemas/RedactionSummary"
         feedback:
           type: array
           items:
@@ -243,6 +288,9 @@ components:
         - slopScore
         - slopTier
         - similarityMatches
+        - sectionHashes
+        - sectionMatches
+        - redactionSummary
         - feedback
         - fileSize
         - createdAt

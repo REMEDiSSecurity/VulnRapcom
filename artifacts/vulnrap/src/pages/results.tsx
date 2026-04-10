@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 function anonymizeId(id: number): string {
   const hex = id.toString(16).padStart(4, "0");
@@ -45,10 +46,34 @@ function getSlopExplainer(score: number): string {
   return "Strong AI-generation signals throughout. This report will likely be flagged or rejected by most triage teams. A complete rewrite with original research is recommended.";
 }
 
+const REDACTION_LABELS: Record<string, string> = {
+  email: "Email Addresses",
+  ipv4: "IPv4 Addresses",
+  ipv6: "IPv6 Addresses",
+  api_key: "API Keys",
+  bearer_token: "Bearer Tokens",
+  jwt: "JWT Tokens",
+  aws_key: "AWS Keys",
+  private_key: "Private Keys",
+  password: "Passwords",
+  connection_string: "Connection Strings",
+  url_with_creds: "URLs with Credentials",
+  hex_secret: "Hex Secrets",
+  uuid: "UUIDs",
+  phone: "Phone Numbers",
+  ssn: "SSNs",
+  credit_card: "Credit Cards",
+  internal_hostname: "Internal Hostnames",
+  internal_url: "Internal URLs",
+  company_name: "Company Names",
+  username: "Usernames",
+};
+
 export default function Results() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
   const { toast } = useToast();
+  const [showFullReport, setShowFullReport] = useState(false);
 
   const { data: report, isLoading, isError } = useGetReport(id, {
     query: {
@@ -64,7 +89,7 @@ export default function Results() {
 
   const copyHash = (hash: string) => {
     navigator.clipboard.writeText(hash);
-    toast({ title: "Hash copied", description: "Content hash copied to clipboard." });
+    toast({ title: "Hash copied", description: "Hash copied to clipboard." });
   };
 
   if (isLoading) {
@@ -89,6 +114,10 @@ export default function Results() {
       </div>
     );
   }
+
+  const sectionHashes = report.sectionHashes as Record<string, string> | undefined;
+  const sectionMatches = report.sectionMatches as Array<{ sectionTitle: string; matchedReportId: number; matchedSectionTitle: string; similarity: number }> | undefined;
+  const redactionSummary = report.redactionSummary as { totalRedactions: number; categories: Record<string, number> } | undefined;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -165,7 +194,7 @@ export default function Results() {
               <div className="text-xs text-muted-foreground uppercase mb-1 flex items-center justify-between">
                 <span className="flex items-center">
                   SHA-256 Hash
-                  <Hint text="A cryptographic fingerprint of your report content. If someone uploads the exact same file, this hash will match -- that is how we detect exact duplicates." />
+                  <Hint text="A cryptographic fingerprint of your report content (after auto-redaction). If someone uploads the exact same file, this hash will match -- that is how we detect exact duplicates." />
                 </span>
                 <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => copyHash(report.contentHash)}>
                   <Copy className="w-3 h-3" />
@@ -178,6 +207,35 @@ export default function Results() {
           </CardContent>
         </Card>
       </div>
+
+      {redactionSummary && redactionSummary.totalRedactions > 0 && (
+        <Card className="bg-card/40 backdrop-blur border-green-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-green-500" />
+              Auto-Redaction Summary
+              <Hint text="Before storing or analyzing your report, we automatically scan for and redact personally identifiable information, secrets, credentials, and company names. Only the redacted version is stored and compared." />
+            </CardTitle>
+            <CardDescription>
+              {redactionSummary.totalRedactions} item{redactionSummary.totalRedactions !== 1 ? "s" : ""} automatically redacted before analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {Object.entries(redactionSummary.categories).map(([category, count]) => (
+                <div key={category} className="bg-muted/50 rounded-lg p-3 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {REDACTION_LABELS[category] || category}
+                  </span>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {count as number}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-card/40 backdrop-blur border-border">
         <CardHeader>
@@ -221,6 +279,76 @@ export default function Results() {
         </CardContent>
       </Card>
 
+      {sectionHashes && Object.keys(sectionHashes).length > 0 && (
+        <Card className="bg-card/40 backdrop-blur border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-primary" />
+              Section-Level Analysis
+              <Hint text="Your report is parsed into logical sections (by headers or paragraphs). Each section is independently hashed with SHA-256 for granular matching. This detects when individual sections are reused across reports even if the full document differs." />
+            </CardTitle>
+            <CardDescription>
+              {Object.keys(sectionHashes).filter(k => k !== "__full_document").length} sections parsed and hashed independently
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              {Object.entries(sectionHashes)
+                .filter(([key]) => key !== "__full_document")
+                .map(([title, hash]) => (
+                  <div key={title} className="flex items-center justify-between bg-muted/50 rounded-lg p-3 group">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Hash className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                      <span className="text-sm font-medium truncate">{title}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground hidden sm:inline truncate max-w-[200px]">
+                        {(hash as string).slice(0, 16)}...
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => copyHash(hash as string)}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {sectionMatches && sectionMatches.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-500" />
+                    Matching Sections Found
+                  </h4>
+                  <div className="space-y-2">
+                    {sectionMatches.map((match, i) => (
+                      <div key={i} className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span>
+                            <strong>{match.sectionTitle}</strong> matches{" "}
+                            <span className="font-mono text-primary">{anonymizeId(match.matchedReportId)}</span>
+                            {match.matchedSectionTitle !== match.sectionTitle && (
+                              <span className="text-muted-foreground"> ({match.matchedSectionTitle})</span>
+                            )}
+                          </span>
+                          <Badge variant="secondary" className="font-mono">{match.similarity}%</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="bg-card/40 backdrop-blur border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -249,6 +377,34 @@ export default function Results() {
           )}
         </CardContent>
       </Card>
+
+      {report.redactedText && (
+        <Card className="bg-card/40 backdrop-blur border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Redacted Report Content
+              <Hint text="This is the auto-redacted version of your report that was stored and compared. PII, secrets, and identifying information have been replaced with redaction tags." />
+            </CardTitle>
+            <CardDescription>Auto-redacted version stored in the platform</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFullReport(!showFullReport)}
+              className="mb-4"
+            >
+              {showFullReport ? "Hide Report" : "Show Redacted Report"}
+            </Button>
+            {showFullReport && (
+              <pre className="bg-muted/50 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto border border-border leading-relaxed">
+                {report.redactedText}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

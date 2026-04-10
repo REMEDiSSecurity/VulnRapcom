@@ -5,7 +5,10 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 0.1.0
  */
+import type { RedactionSummary } from "./redactionSummary";
 import type { ReportAnalysisContentMode } from "./reportAnalysisContentMode";
+import type { ReportAnalysisSectionHashes } from "./reportAnalysisSectionHashes";
+import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
 
 export interface ReportAnalysis {
@@ -17,6 +20,16 @@ export interface ReportAnalysis {
   /** Human-readable sloppiness tier */
   slopTier: string;
   similarityMatches: SimilarityMatch[];
+  /** SHA-256 hashes of each report section for granular similarity */
+  sectionHashes: ReportAnalysisSectionHashes;
+  /** Sections that match existing reports */
+  sectionMatches: SectionMatchItem[];
+  /**
+   * Auto-redacted version of the report (PII/secrets removed)
+   * @nullable
+   */
+  redactedText?: string | null;
+  redactionSummary: RedactionSummary;
   feedback: string[];
   /** @nullable */
   fileName?: string | null;

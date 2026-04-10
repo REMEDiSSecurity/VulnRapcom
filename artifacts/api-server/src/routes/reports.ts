@@ -17,6 +17,8 @@ const SubmitReportBodySchema = z.object({
 });
 import { computeMinHash, computeSimhash, computeContentHash, computeLSHBuckets, findSimilarReports } from "../lib/similarity";
 import { analyzeSloppiness } from "../lib/sloppiness";
+import { redactReport } from "../lib/redactor";
+import { parseSections, findSectionMatches } from "../lib/section-parser";
 import { sanitizeText, sanitizeFileName } from "../lib/sanitize";
 import { extractTextFromPdf } from "../lib/pdf";
 import { sql } from "drizzle-orm";
@@ -94,10 +96,16 @@ router.post("/reports", async (req, res): Promise<void> => {
     return;
   }
 
-  const contentHash = computeContentHash(text);
-  const simhash = computeSimhash(text);
-  const minhashSignature = computeMinHash(text);
+  const { redactedText, summary: redactionSummary } = redactReport(text);
+
+  const analysisText = redactedText;
+
+  const contentHash = computeContentHash(analysisText);
+  const simhash = computeSimhash(analysisText);
+  const minhashSignature = computeMinHash(analysisText);
   const lshBuckets = computeLSHBuckets(minhashSignature);
+
+  const { sections, sectionHashes } = parseSections(analysisText);
 
   const existingReports = await db
     .select({
@@ -105,6 +113,7 @@ router.post("/reports", async (req, res): Promise<void> => {
       minhashSignature: reportsTable.minhashSignature,
       simhash: reportsTable.simhash,
       lshBuckets: reportsTable.lshBuckets,
+      sectionHashes: reportsTable.sectionHashes,
     })
     .from(reportsTable);
 
@@ -113,6 +122,11 @@ router.post("/reports", async (req, res): Promise<void> => {
     simhash,
     lshBuckets,
     existingReports as Array<{ id: number; minhashSignature: number[]; simhash: string; lshBuckets: string[] }>,
+  );
+
+  const sectionMatches = findSectionMatches(
+    sectionHashes,
+    existingReports as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
   const analysis = analyzeSloppiness(text);
@@ -126,11 +140,15 @@ router.post("/reports", async (req, res): Promise<void> => {
       simhash,
       minhashSignature,
       lshBuckets,
-      contentText: contentMode === "full" ? text : null,
+      contentText: contentMode === "full" ? analysisText : null,
+      redactedText: contentMode === "full" ? analysisText : null,
       contentMode,
       slopScore: analysis.score,
       slopTier: analysis.tier,
       similarityMatches,
+      sectionHashes,
+      sectionMatches,
+      redactionSummary,
       feedback: analysis.feedback,
       fileName: safeFileName,
       fileSize: req.file.size,
@@ -178,6 +196,10 @@ router.post("/reports", async (req, res): Promise<void> => {
     slopScore: report.slopScore,
     slopTier: report.slopTier,
     similarityMatches: report.similarityMatches,
+    sectionHashes: report.sectionHashes ?? {},
+    sectionMatches: report.sectionMatches ?? [],
+    redactedText: report.redactedText,
+    redactionSummary: report.redactionSummary ?? { totalRedactions: 0, categories: {} },
     feedback: report.feedback,
     fileName: report.fileName,
     fileSize: report.fileSize,
@@ -211,6 +233,10 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     slopScore: report.slopScore,
     slopTier: report.slopTier,
     similarityMatches: report.similarityMatches,
+    sectionHashes: report.sectionHashes ?? {},
+    sectionMatches: report.sectionMatches ?? [],
+    redactedText: report.redactedText,
+    redactionSummary: report.redactionSummary ?? { totalRedactions: 0, categories: {} },
     feedback: report.feedback,
     fileName: report.fileName,
     fileSize: report.fileSize,

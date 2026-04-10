@@ -30,6 +30,20 @@ export interface SimilarityMatch {
   matchType: SimilarityMatchMatchType;
 }
 
+export interface SectionMatchItem {
+  sectionTitle: string;
+  matchedReportId: number;
+  matchedSectionTitle: string;
+  similarity: number;
+}
+
+export type RedactionSummaryCategories = { [key: string]: number };
+
+export interface RedactionSummary {
+  totalRedactions: number;
+  categories: RedactionSummaryCategories;
+}
+
 export type ReportAnalysisContentMode =
   (typeof ReportAnalysisContentMode)[keyof typeof ReportAnalysisContentMode];
 
@@ -37,6 +51,11 @@ export const ReportAnalysisContentMode = {
   full: "full",
   similarity_only: "similarity_only",
 } as const;
+
+/**
+ * SHA-256 hashes of each report section for granular similarity
+ */
+export type ReportAnalysisSectionHashes = { [key: string]: string };
 
 export interface ReportAnalysis {
   id: number;
@@ -47,6 +66,16 @@ export interface ReportAnalysis {
   /** Human-readable sloppiness tier */
   slopTier: string;
   similarityMatches: SimilarityMatch[];
+  /** SHA-256 hashes of each report section for granular similarity */
+  sectionHashes: ReportAnalysisSectionHashes;
+  /** Sections that match existing reports */
+  sectionMatches: SectionMatchItem[];
+  /**
+   * Auto-redacted version of the report (PII/secrets removed)
+   * @nullable
+   */
+  redactedText?: string | null;
+  redactionSummary: RedactionSummary;
   feedback: string[];
   /** @nullable */
   fileName?: string | null;

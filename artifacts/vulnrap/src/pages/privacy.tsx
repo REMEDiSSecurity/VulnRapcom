@@ -1,4 +1,4 @@
-import { Shield, Lock, FileText, Database, Server, Eye, Fingerprint, Users, Globe, Trash2, Scale } from "lucide-react";
+import { Shield, Lock, FileText, Database, Server, Eye, Fingerprint, Users, Globe, Trash2, Scale, ShieldCheck, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
@@ -13,7 +13,7 @@ export default function Privacy() {
           Privacy Policy & Data Practices
         </h1>
         <p className="text-muted-foreground mt-2 max-w-3xl leading-relaxed">
-          VulnRap is built on the principle that security researchers should be able to validate their work without exposing their findings. Here is exactly what we do with your data, why we do it, and how it helps the ecosystem.
+          VulnRap is built on transparency. Here is exactly what we do with your data, how we protect it, and what other users can see. No fine print, no surprises.
         </p>
       </div>
 
@@ -30,11 +30,74 @@ export default function Privacy() {
           </p>
           <ul className="space-y-2 list-disc pl-5">
             <li><strong className="text-foreground">For researchers:</strong> Check if your report has been submitted before, get an honest assessment of quality, and improve your report before submission.</li>
-            <li><strong className="text-foreground">For the ecosystem:</strong> Every report analyzed improves our fingerprint corpus. When a researcher discovers their report matches an existing one, that saves everyone time -- theirs, the triage team's, and the program's.</li>
+            <li><strong className="text-foreground">For the ecosystem:</strong> Every report analyzed improves our fingerprint corpus. When a researcher discovers their report matches an existing one, that saves everyone time.</li>
             <li><strong className="text-foreground">For trust:</strong> Platforms can point researchers here as a pre-submission check, reducing duplicate submissions and AI slop before they clog the pipeline.</li>
           </ul>
         </CardContent>
       </Card>
+
+      <Card className="bg-card/40 backdrop-blur border-yellow-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-yellow-500">
+            <Eye className="w-5 h-5" />
+            What You Should Know Upfront
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+          <p className="font-medium text-foreground">
+            VulnRap stores and compares report data. That is the whole point of the platform.
+          </p>
+          <ul className="space-y-2 list-disc pl-5">
+            <li>When you upload a report, we <strong className="text-foreground">auto-redact</strong> sensitive information (PII, secrets, credentials, company names) and store only the redacted version.</li>
+            <li>Your redacted report is <strong className="text-foreground">compared against all other reports</strong> in our database. Other users' reports are compared against yours.</li>
+            <li>Similarity scores, section-level hash matches, and AI sloppiness results are <strong className="text-foreground">visible to anyone with the report link</strong>.</li>
+            <li>We do <strong className="text-foreground">not</strong> share your report with bug bounty platforms, vendors, or third parties. The comparison happens only within VulnRap.</li>
+          </ul>
+          <p>
+            If you do not want your report stored and compared, do not upload it. There is no "view only" mode -- comparison is the core function of this platform.
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-green-500" />
+          Auto-Redaction Engine
+        </h2>
+
+        <Card className="bg-card/40 backdrop-blur border-border">
+          <CardContent className="pt-6 space-y-4 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              Before your report is stored or analyzed, it passes through our deterministic auto-redaction engine. This is not optional -- it runs on every upload. The same input always produces the same output.
+            </p>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <h4 className="text-sm font-bold text-foreground">What gets redacted:</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Email addresses</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> IP addresses (IPv4 and IPv6)</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> API keys and access tokens</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> JWT tokens and bearer tokens</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> AWS access keys</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Passwords and credentials</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Database connection strings</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Private keys (RSA, EC)</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Phone numbers and SSNs</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Credit card numbers</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Company names (Inc, LLC, Corp, etc.)</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Usernames and author attributions</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> Internal hostnames and URLs</div>
+                <div className="flex items-start gap-2"><span className="text-green-500 mt-0.5 flex-shrink-0">--</span> UUIDs and hex secrets</div>
+              </div>
+            </div>
+            <p>
+              Redacted items are replaced with tagged placeholders like <code className="text-primary text-xs bg-muted px-1 py-0.5 rounded">[REDACTED_EMAIL]</code> or <code className="text-primary text-xs bg-muted px-1 py-0.5 rounded">[REDACTED_API_KEY]</code>. Your results page shows a breakdown of exactly what was redacted and how many of each type.
+            </p>
+            <p className="text-xs italic">
+              Auto-redaction is regex-based and deterministic. It may not catch every possible sensitive value. Do not rely on it as your only protection -- if your report contains highly sensitive information, review it before uploading.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="space-y-6">
         <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
@@ -46,29 +109,23 @@ export default function Privacy() {
           <CardHeader>
             <CardTitle className="uppercase tracking-wide text-sm text-muted-foreground flex items-center gap-2">
               <Fingerprint className="w-4 h-4" />
-              Similarity Only Mode (Default)
+              Similarity Only Mode
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm leading-relaxed">
-              In this mode, we extract structural features from your report and generate mathematical fingerprints. The original file and all plaintext content are <strong>immediately discarded from memory</strong> after analysis completes. We never write your content to disk.
+              In this mode, we generate mathematical fingerprints from the redacted version of your report. The redacted text is not stored -- only the hashes. The original raw text is never stored in any mode.
             </p>
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h4 className="text-sm font-bold">What we store:</h4>
               <ul className="text-sm space-y-1.5 text-muted-foreground">
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> SHA-256 content hash (for exact-match deduplication)</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> SHA-256 content hash of redacted text (for exact-match deduplication)</li>
                 <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> MinHash signature (128 hash values for fuzzy matching)</li>
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Simhash fingerprint (single 64-bit structural hash)</li>
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> AI sloppiness score and tier classification</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Simhash fingerprint (64-bit structural hash)</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Section-level SHA-256 hashes (each section hashed independently)</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> AI sloppiness score, tier, and feedback</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Redaction summary (counts of what was redacted, not the values)</li>
                 <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> File name and size (metadata only)</li>
-              </ul>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-              <h4 className="text-sm font-bold">What we do NOT store:</h4>
-              <ul className="text-sm space-y-1.5 text-muted-foreground">
-                <li className="flex items-start gap-2"><span className="text-destructive mt-1 flex-shrink-0">x</span> Original report text or file content</li>
-                <li className="flex items-start gap-2"><span className="text-destructive mt-1 flex-shrink-0">x</span> IP addresses, browser fingerprints, or cookies</li>
-                <li className="flex items-start gap-2"><span className="text-destructive mt-1 flex-shrink-0">x</span> User accounts or any personal identifiers</li>
               </ul>
             </div>
             <p className="text-xs text-muted-foreground italic">
@@ -86,20 +143,46 @@ export default function Privacy() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm leading-relaxed">
-              In this mode, we store everything from Similarity Only mode <strong>plus</strong> the full text content of your report. This is a voluntary opt-in that helps improve the quality of the community corpus.
+              In this mode, we store everything from Similarity Only mode <strong>plus</strong> the auto-redacted text of your report. The original (pre-redaction) text is never stored. This helps build a richer comparison corpus for future users.
             </p>
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <h4 className="text-sm font-bold">How stored content helps the ecosystem:</h4>
               <ul className="text-sm space-y-1.5 text-muted-foreground">
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Enables semantic (meaning-based) matching beyond just structural fingerprints</li>
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Improves sloppiness scoring calibration with real-world examples</li>
-                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Builds a richer corpus so future researchers get better duplicate detection</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Enables richer semantic matching beyond structural fingerprints</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Improves sloppiness scoring with real-world examples</li>
+                <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Builds a larger corpus so future researchers get better duplicate detection</li>
                 <li className="flex items-start gap-2"><span className="text-primary mt-1 flex-shrink-0">--</span> Helps identify common patterns in AI-generated reports</li>
               </ul>
             </div>
-            <p className="text-sm text-muted-foreground">
-              We recommend this mode for reports covering already-disclosed vulnerabilities, public CVEs, or general research where confidentiality is not a concern.
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-6">
+        <h2 className="text-xl font-bold uppercase tracking-tight flex items-center gap-2">
+          <Layers className="w-5 h-5 text-primary" />
+          How Comparison Works
+        </h2>
+
+        <Card className="bg-card/40 backdrop-blur border-border">
+          <CardContent className="pt-6 space-y-4 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              When you upload a report, it is compared against every other report in our database. Here is what that means:
             </p>
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="font-bold text-foreground mb-2">Full-Document Similarity</h4>
+                <p>MinHash signatures (128 permutations) and Simhash fingerprints measure overall similarity. LSH (Locality-Sensitive Hashing) with 16 bands narrows candidates before full comparison. Results above 15% similarity are shown.</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="font-bold text-foreground mb-2">Section-Level Hashing</h4>
+                <p>Your report is split into logical sections (by markdown headers or paragraph breaks). Each section is hashed independently with SHA-256. If any section hash matches a section in another report exactly, that match is flagged -- even if the overall documents are different.</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="font-bold text-foreground mb-2">What Other Users See</h4>
+                <p>When another user uploads a report that matches yours, they see: the similarity percentage, the match type, section-level matches, and your anonymized report ID. They do <strong>not</strong> see your report content, file name, or any identifying information.</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -163,7 +246,7 @@ export default function Privacy() {
                   Platform Independence
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  VulnRap is not affiliated with any bug bounty platform (HackerOne, Bugcrowd, Intigriti, YesWeHack). We do not share data with vendors, programs, or third parties.
+                  VulnRap is not affiliated with any bug bounty platform. We do not share data with vendors, programs, or third parties. Comparison happens only within this platform.
                 </p>
               </div>
               <div className="space-y-3">
@@ -181,7 +264,7 @@ export default function Privacy() {
                   Data Lifecycle
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  In Similarity Only mode, content exists only in process memory during analysis (typically under 2 seconds). Hashes are stored indefinitely to maintain corpus accuracy.
+                  Raw (pre-redaction) content is never written to disk or database. It exists only in process memory during analysis. Hashes and redacted content are stored indefinitely.
                 </p>
               </div>
             </div>
@@ -198,30 +281,37 @@ export default function Privacy() {
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground leading-relaxed">
           <div className="space-y-3">
-            <h3 className="font-bold text-foreground">Researcher Responsibility</h3>
+            <h3 className="font-bold text-foreground">Auto-Redaction Is Not Perfect</h3>
             <p>
-              If your report contains personally identifiable information (PII), target credentials, API keys, or other sensitive data beyond the vulnerability description itself, redact these before uploading regardless of which privacy mode you select.
+              Our redaction engine uses pattern matching and heuristics. It catches most common PII patterns (emails, IPs, API keys, passwords, company names, etc.), but it cannot guarantee 100% coverage. If your report contains highly sensitive or unusual identifiers, review the redacted output on your results page before sharing the link.
             </p>
           </div>
           <Separator />
           <div className="space-y-3">
-            <h3 className="font-bold text-foreground">Report Results</h3>
+            <h3 className="font-bold text-foreground">Report Results Are Linkable</h3>
             <p>
-              Analysis results are accessible via a shareable link containing the report's numeric ID. Anyone with this link can view the analysis results (sloppiness score, similarity matches, feedback). No original content is exposed through these links in Similarity Only mode.
+              Analysis results are accessible via a shareable link containing the report's numeric ID. Anyone with this link can view the analysis results (sloppiness score, similarity matches, section hashes, feedback, and redacted content in Full mode). Keep your result link private if you do not want others to see your analysis.
             </p>
           </div>
           <Separator />
           <div className="space-y-3">
             <h3 className="font-bold text-foreground">Open Source & Transparency</h3>
             <p>
-              VulnRap's similarity engine uses deterministic, seeded algorithms (SHA-256 for hashing, MinHash with 128 permutations for fuzzy matching, Simhash for structural similarity). The scoring is fully heuristic-based with no opaque ML models. What you see is what runs.
+              VulnRap's similarity engine uses deterministic, seeded algorithms (SHA-256 for hashing, MinHash with 128 permutations for fuzzy matching, Simhash for structural similarity, section-level SHA-256 for granular matching). The scoring is fully heuristic-based with no opaque ML models. What you see is what runs.
+            </p>
+          </div>
+          <Separator />
+          <div className="space-y-3">
+            <h3 className="font-bold text-foreground">API Documentation</h3>
+            <p>
+              VulnRap exposes a fully documented REST API. You can browse the interactive API documentation at <code className="text-primary text-xs bg-muted px-1 py-0.5 rounded">/api/docs</code> to see all available endpoints, request formats, and response schemas.
             </p>
           </div>
         </CardContent>
       </Card>
 
       <div className="text-center py-4 text-xs text-muted-foreground space-y-2">
-        <p>Questions about our data practices? This policy was written to be comprehensive, not to hide anything.</p>
+        <p>This policy was written to be honest, not to hide anything. If something is unclear, that is a bug we want to fix.</p>
         <p>
           <Link to="/" className="text-primary hover:underline">Back to Report Validation</Link>
         </p>

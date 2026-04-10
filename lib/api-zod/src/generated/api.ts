@@ -61,6 +61,27 @@ export const GetReportResponse = zod.object({
       ]),
     }),
   ),
+  sectionHashes: zod
+    .record(zod.string(), zod.string())
+    .describe("SHA-256 hashes of each report section for granular similarity"),
+  sectionMatches: zod
+    .array(
+      zod.object({
+        sectionTitle: zod.string(),
+        matchedReportId: zod.number(),
+        matchedSectionTitle: zod.string(),
+        similarity: zod.number(),
+      }),
+    )
+    .describe("Sections that match existing reports"),
+  redactedText: zod
+    .string()
+    .nullish()
+    .describe("Auto-redacted version of the report (PII\/secrets removed)"),
+  redactionSummary: zod.object({
+    totalRedactions: zod.number(),
+    categories: zod.record(zod.string(), zod.number()),
+  }),
   feedback: zod.array(zod.string()),
   fileName: zod.string().nullish(),
   fileSize: zod.number(),

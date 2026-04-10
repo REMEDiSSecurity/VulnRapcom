@@ -38,6 +38,13 @@ export interface SimilarityMatch {
   matchType: string;
 }
 
+export interface SectionMatch {
+  sectionTitle: string;
+  matchedReportId: number;
+  matchedSectionTitle: string;
+  similarity: number;
+}
+
 export const insertReportSchema = createInsertSchema(reportsTable).omit({
   id: true,
   createdAt: true,
