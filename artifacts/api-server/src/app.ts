@@ -19,8 +19,10 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
     },
   },
 }));
@@ -119,6 +121,14 @@ app.get("/security.txt", (_req, res) => {
 });
 
 app.use("/api", router);
+
+if (process.env.NODE_ENV === "production") {
+  const frontendDir = path.resolve(__dirname, "..", "..", "vulnrap", "dist", "public");
+  app.use(express.static(frontendDir, { maxAge: "1d" }));
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
+}
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error({ err: err.message, stack: err.stack }, "Unhandled error");
