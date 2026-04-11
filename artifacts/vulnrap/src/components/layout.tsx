@@ -88,22 +88,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
             mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           )}
         >
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <nav className="relative bg-background/95 backdrop-blur-md border-b border-border/20 shadow-xl">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-1">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+          <nav className="relative bg-background border-b border-primary/10 shadow-2xl shadow-black/50">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-0.5">
               {NAV_ITEMS.map((item) => (
                 <Link
                   key={item.to}
                   to={item.to}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all",
+                    "flex items-center gap-3 px-4 py-3.5 rounded-lg text-base font-medium transition-all",
                     (item.to === "/" ? pathname === "/" : pathname.startsWith(item.to))
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                      ? "text-primary bg-primary/10 glow-text-sm"
+                      : "text-foreground/80 hover:text-primary hover:bg-primary/5"
                   )}
                 >
-                  <span className="w-5 flex items-center justify-center">{item.icon}</span>
+                  <span className="w-5 flex items-center justify-center opacity-70">{item.icon}</span>
                   {item.label}
                 </Link>
               ))}
