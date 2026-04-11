@@ -80,7 +80,7 @@ export default function UseCases() {
           Use Cases
         </h1>
         <p className="text-muted-foreground mt-2 max-w-3xl leading-relaxed">
-          VulnRap works for anyone who writes, receives, or triages vulnerability reports. Here is how different teams use it.
+          VulnRap works for anyone who receives or triages vulnerability reports. Here is how different teams use it.
         </p>
       </div>
 

@@ -15,7 +15,7 @@ import logoSrc from "@/assets/logo.png";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_TEXT_LENGTH = 20 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".txt", ".md"];
+const ALLOWED_EXTENSIONS = [".txt", ".md", ".pdf"];
 
 function getSlopColor(score: number) {
   if (score < 30) return "text-green-500";
@@ -50,7 +50,7 @@ function validateFile(file: File): string | null {
   const ext = file.name.toLowerCase();
   const hasValidExt = ALLOWED_EXTENSIONS.some(e => ext.endsWith(e));
   if (!hasValidExt) {
-    return `Unsupported file type. Accepted formats: ${ALLOWED_EXTENSIONS.join(", ")}`;
+    return `Unsupported file type. Accepted formats: .txt, .md, .pdf`;
   }
   if (file.size > MAX_FILE_SIZE) {
     return `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 20MB.`;
@@ -760,7 +760,7 @@ export default function Home() {
         </div>
         <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight text-primary uppercase glow-text" data-testid="text-heading">Report Validation</h1>
         <p className="text-sm sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed px-2">
-          Analyze incoming vulnerability reports for AI-generated "slop" and cross-check against known submissions. Built for PSIRT teams, triage analysts, and anyone buried in an inbox full of bug bounty reports.
+          Analyze incoming vulnerability reports for AI-generated "slop" and cross-check against known submissions. Built for PSIRT teams, triage analysts, and anyone buried in an inbox full of incoming reports.
         </p>
       </div>
 
@@ -1082,7 +1082,7 @@ function TransparencySection() {
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">1.</span>Your raw text is received over HTTPS. For URLs, we fetch the content server-side (HTTPS only, allowlisted hosts).</li>
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">2.</span>The redaction engine runs immediately — regex patterns strip PII, secrets, credentials, and company names. The raw text is discarded and never stored.</li>
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">3.</span>All analysis (hashing, similarity, slop scoring) runs on the redacted text only.</li>
-                <li className="flex gap-2"><span className="text-violet-400 mt-0.5">4.</span>The slop score uses the original text (for phrase detection accuracy) but this text is held only in server memory during processing and is never written to disk or database.</li>
+                <li className="flex gap-2"><span className="text-violet-400 mt-0.5">4.</span>The heuristic slop scorer uses the original text in server memory for phrase detection accuracy — this text is never written to disk or database. When the optional LLM layer is enabled, the redacted version is sent to the configured AI provider for semantic analysis.</li>
               </ul>
             </div>
           </div>

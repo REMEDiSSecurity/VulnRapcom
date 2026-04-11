@@ -2,7 +2,7 @@
 
 **Like VirusTotal, but for vulnerability reports.**
 
-VulnRap is a free, anonymous vulnerability report validation platform for bug bounty hunters and PSIRT teams. Upload a report and instantly get:
+VulnRap is a free, anonymous vulnerability report validation platform built for PSIRT and triage teams receiving vulnerability reports. Upload an incoming report and instantly get:
 
 - **AI Slop Detection** — Heuristic scoring (0-100) that flags AI-generated filler, missing technical depth, and stylometric red flags
 - **Similarity Matching** — MinHash + LSH + SimHash fingerprinting catches near-duplicate and structurally similar submissions across the entire database
@@ -13,7 +13,7 @@ Reports are auto-redacted, then compared. Nothing identifies you. No accounts re
 
 ## Why This Exists
 
-PSIRT teams waste hours triaging AI-generated garbage and duplicate submissions. Bug bounty hunters unknowingly submit reports that are near-identical to existing ones. VulnRap gives both sides a quick sanity check before the report enters a program's queue.
+PSIRT teams waste hours triaging AI-generated garbage and duplicate submissions. VulnRap gives triage teams a quick sanity check on incoming reports before they consume analyst time.
 
 Built and funded by [REMEDiS Security](https://remedissecurity.com) and [COMPLiTT](https://complitt.com).
 
@@ -178,7 +178,7 @@ Full interactive API docs: [vulnrap.com/api/docs](https://vulnrap.com/api/docs) 
 | `/` | Submit a report for analysis |
 | `/results/:id` | Full analysis results with slop score, similarity, redaction summary, verification badge |
 | `/check` | Receiver flow — analyze an incoming report without storing anything |
-| `/verify/:id` | Public verification page for sharing with bug bounty programs |
+| `/verify/:id` | Public verification page for sharing with vulnerability programs |
 | `/stats` | Platform statistics dashboard |
 | `/developers` | API documentation and integration guide |
 | `/privacy` | Privacy policy explaining what is stored and how |

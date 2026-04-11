@@ -289,7 +289,7 @@ router.post("/reports", async (req, res): Promise<void> => {
 
   const [analysis, llmResult] = await Promise.all([
     Promise.resolve(analyzeSloppiness(text)),
-    analyzeSlopWithLLM(text),
+    analyzeSlopWithLLM(redactedText),
   ]);
 
   const finalSlopScore = llmResult
@@ -488,10 +488,11 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     checkCandidates as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
+  const { redactedText: checkRedactedText } = { redactedText: analysisText };
   const [[analysis, llmCheckResult], [existingReport]] = await Promise.all([
     Promise.all([
       Promise.resolve(analyzeSloppiness(text)),
-      analyzeSlopWithLLM(text),
+      analyzeSlopWithLLM(checkRedactedText),
     ]),
     db.select({ id: reportsTable.id })
       .from(reportsTable)
