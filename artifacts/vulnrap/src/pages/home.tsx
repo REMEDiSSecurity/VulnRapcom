@@ -567,6 +567,26 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [stage, setStage] = useState<UploadStage>("idle");
+  const logoRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const el = logoRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const cy = rect.top + rect.height / 2;
+      document.documentElement.style.setProperty("--beam-origin-y", `${cy}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("scroll", update, { passive: true });
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("scroll", update);
+      document.documentElement.style.removeProperty("--beam-origin-y");
+    };
+  }, []);
 
   const submitMutation = useSubmitReport({
     mutation: {
