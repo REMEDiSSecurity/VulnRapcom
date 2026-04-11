@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn, anonymizeId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { addHistoryEntry } from "@/lib/history";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".md"];
@@ -83,7 +84,20 @@ export default function Check() {
   const checkMutation = useCheckReport({
     mutation: {
       onSuccess: (data) => {
-        setResult(data as unknown as CheckResultData);
+        const r = data as unknown as CheckResultData;
+        setResult(r);
+        const checkId = Date.now();
+        addHistoryEntry({
+          id: checkId,
+          reportCode: r.existingReportId ? anonymizeId(r.existingReportId) : `CHK-${checkId.toString(16).slice(-4).toUpperCase()}`,
+          slopScore: r.slopScore,
+          slopTier: r.slopTier,
+          matchCount: r.similarityMatches?.length || 0,
+          contentMode: "check",
+          fileName: inputMode === "file" && file ? file.name : null,
+          timestamp: new Date().toISOString(),
+          type: "check",
+        });
         toast({ title: "Check complete", description: "Report analyzed against our database." });
       },
       onError: (err: unknown) => {

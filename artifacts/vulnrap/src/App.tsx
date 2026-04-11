@@ -33,6 +33,9 @@ const UseCases = lazyRetry(() => import("@/pages/use-cases"));
 const Terms = lazyRetry(() => import("@/pages/terms"));
 const Blog = lazyRetry(() => import("@/pages/blog"));
 const Changelog = lazyRetry(() => import("@/pages/changelog"));
+const History = lazyRetry(() => import("@/pages/history"));
+const Compare = lazyRetry(() => import("@/pages/compare"));
+const Batch = lazyRetry(() => import("@/pages/batch"));
 const NotFound = lazyRetry(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient();
@@ -63,6 +66,9 @@ function AppRoutes() {
             <Route path="/blog" element={<Blog />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/changelog" element={<Changelog />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/compare" element={<Compare />} />
+            <Route path="/batch" element={<Batch />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

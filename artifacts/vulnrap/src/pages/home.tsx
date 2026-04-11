@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X, Link2, ChevronDown, Play, AlertTriangle, Trash2, Mail } from "lucide-react";
 import { LogoBeams } from "@/components/laser-effects";
 import { useSubmitReport, SubmitReportBodyContentMode, useGetReportFeed } from "@workspace/api-client-react";
+import { addHistoryEntry } from "@/lib/history";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -603,6 +604,17 @@ export default function Home() {
             sessionStorage.setItem("vulnrap_delete_tokens", JSON.stringify(tokens));
           } catch {}
         }
+        addHistoryEntry({
+          id: data.id,
+          reportCode: anonymizeId(data.id),
+          slopScore: data.slopScore,
+          slopTier: data.slopTier,
+          matchCount: data.similarityMatches?.length || 0,
+          contentMode: data.contentMode,
+          fileName: data.fileName || null,
+          timestamp: new Date().toISOString(),
+          type: "submit",
+        });
         toast({ title: "Analysis complete", description: "Navigating to results..." });
         setTimeout(() => navigate(`/results/${data.id}`), 600);
       },

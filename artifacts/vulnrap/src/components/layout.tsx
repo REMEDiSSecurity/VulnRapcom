@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Activity, Search, Code, BookOpen, Target, MessageSquare, Menu, X, Github } from "lucide-react";
+import { Activity, Search, Code, BookOpen, Target, MessageSquare, Menu, X, Github, Clock, GitCompare, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 import logoSrc from "@/assets/logo.png";
 import { LaserEffects } from "@/components/laser-effects";
@@ -18,8 +18,10 @@ function feedbackMailto(page: string) {
 const NAV_ITEMS = [
   { to: "/", label: "Submit", icon: null },
   { to: "/check", label: "Check", icon: <Search className="w-3.5 h-3.5" /> },
+  { to: "/batch", label: "Batch", icon: <UploadCloud className="w-3.5 h-3.5" /> },
+  { to: "/compare", label: "Compare", icon: <GitCompare className="w-3.5 h-3.5" /> },
+  { to: "/history", label: "History", icon: <Clock className="w-3.5 h-3.5" /> },
   { to: "/stats", label: "Stats", icon: <Activity className="w-3.5 h-3.5" /> },
-  { to: "/use-cases", label: "Use Cases", icon: <Target className="w-3.5 h-3.5" /> },
   { to: "/developers", label: "API", icon: <Code className="w-3.5 h-3.5" /> },
   { to: "/blog", label: "Blog", icon: <BookOpen className="w-3.5 h-3.5" /> },
 ];

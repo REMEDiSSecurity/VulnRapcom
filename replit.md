@@ -6,6 +6,14 @@ VulnRap.com — a vulnerability report validation platform (like VirusTotal for 
 
 **Current version: 1.2.0** — PSIRT-focused LLM prompt, side-by-side similarity comparison, input hardening.
 
+## Recent Additions (post-1.2.0)
+- **Batch Upload** (`/batch`) — Multi-file drag-and-drop, sequential processing with progress, results links
+- **Compare Two Reports** (`/compare`) — Side-by-side dual text input, independent analysis via /check endpoint, section overlap detection
+- **Session History** (`/history`) — localStorage-based history of all submitted/checked reports, clear/remove entries
+- **Export/Download** — JSON and TXT export buttons on results page, generates downloadable analysis reports
+- **Configurable Thresholds** — Settings panel (localStorage) for custom slop score tiers and similarity thresholds, accessible from results page
+- **GitHub repo links** — All "open source" mentions link to https://github.com/REMEDiSSecurity/VulnRapcom, GitHub icon in footer
+
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
 ## Stack
@@ -38,6 +46,9 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
   - `/` — Home/submit with logo hero, 3 feature explainer cards, drag-and-drop upload, privacy mode selector, "How It Works" steps, hover hint tooltips
   - `/results/:id` — Analysis results: slop score, auto-redaction summary, similarity matches, section-level analysis with per-section hashes, feedback, expandable redacted report view, verification badge with copy buttons, user feedback form (rating + helpful + suggestions)
   - `/check` — Receiver flow: paste/upload a report for read-only analysis (no storage), shows slop score, duplicates, redaction analysis
+  - `/batch` — Batch upload: drag-and-drop multiple files, sequential processing with progress tracking, individual result links
+  - `/compare` — Two-report comparison: paste two reports side by side, independent analysis, section overlap detection
+  - `/history` — Session history: localStorage-based log of all analyses performed in this browser
   - `/verify/:id` — Public verification page: lightweight badge view with slop score, match counts, content hash, submission date
   - `/stats` — Platform statistics dashboard (metrics, distribution histogram, recent activity) — auto-refreshes every 30s, interactive stat cards with hover details
   - `/developers` — API documentation: quick start guide, all endpoints with curl examples, Swagger UI link, integration ideas, example scripts (Python batch checker, Bash CI/CD gate, Node.js Slack bot)

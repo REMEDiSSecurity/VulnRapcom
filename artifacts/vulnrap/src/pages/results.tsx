@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import FeedbackForm from "@/components/feedback-form";
 import { anonymizeId } from "@/lib/utils";
+import { SettingsButton } from "@/components/settings-panel";
+import { getSettings, getSlopColorCustom, getSlopProgressColorCustom, type VulnRapSettings } from "@/lib/settings";
 
 function getSlopColor(score: number) {
   if (score < 30) return "text-green-500";
@@ -89,7 +91,7 @@ function SectionStatusBadge({ status }: { status: string }) {
   return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">Unique</Badge>;
 }
 
-function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string }) {
+function ComparePanel({ reportId, matchId, matchSimilarity, matchType, settings }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string; settings: VulnRapSettings }) {
   const { data: comparison, isLoading, isError } = useCompareReports(reportId, matchId, {
     query: { enabled: true, queryKey: getCompareReportsQueryKey(reportId, matchId) },
   });
@@ -145,7 +147,7 @@ function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { repor
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Your Report ({src.reportCode})</span>
             <div className="flex items-center gap-1.5">
               <Badge variant="outline" className="text-[10px]">
-                Score: <span className={getSlopColor(src.slopScore)}>{src.slopScore}</span>
+                Score: <span className={getSlopColorCustom(src.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh)}>{src.slopScore}</span>
               </Badge>
               <Badge variant="outline" className="text-[9px] text-muted-foreground">{src.contentMode === "similarity_only" ? "hash only" : "full"}</Badge>
             </div>
@@ -163,7 +165,7 @@ function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { repor
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Matched Report ({mtch.reportCode})</span>
             <div className="flex items-center gap-1.5">
               <Badge variant="outline" className="text-[10px]">
-                Score: <span className={getSlopColor(mtch.slopScore)}>{mtch.slopScore}</span>
+                Score: <span className={getSlopColorCustom(mtch.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh)}>{mtch.slopScore}</span>
               </Badge>
               <Badge variant="outline" className="text-[9px] text-muted-foreground">{mtch.contentMode === "similarity_only" ? "hash only" : "full"}</Badge>
             </div>
@@ -210,6 +212,78 @@ export default function Results() {
   const handleDelete = () => {
     if (!deleteToken) return;
     deleteMutation.mutate({ id, data: { deleteToken } });
+  };
+
+  const settings = getSettings();
+
+  const exportJSON = () => {
+    if (!report) return;
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vulnrap-report-${anonymizeId(id)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: "JSON report downloaded." });
+  };
+
+  const exportText = () => {
+    if (!report) return;
+    const lines: string[] = [
+      `VulnRap Analysis Report — ${anonymizeId(id)}`,
+      `Generated: ${new Date().toISOString()}`,
+      ``,
+      `SLOP SCORE: ${report.slopScore}/100 (${report.slopTier})`,
+      report.llmEnhanced ? `Analysis: LLM-Enhanced (40% heuristic + 60% LLM)` : `Analysis: Heuristic Only`,
+    ];
+    if (report.llmEnhanced && report.llmSlopScore != null) {
+      lines.push(`  Heuristic Score: ${Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4)}`);
+      lines.push(`  LLM Score: ${report.llmSlopScore}`);
+    }
+    lines.push(``);
+    lines.push(`FILE: ${report.fileName || "Unknown"} (${(report.fileSize / 1024).toFixed(2)} KB)`);
+    lines.push(`HASH: ${report.contentHash}`);
+    lines.push(`MODE: ${report.contentMode}`);
+    lines.push(`DATE: ${new Date(report.createdAt).toLocaleString()}`);
+    lines.push(``);
+    if (report.similarityMatches && report.similarityMatches.length > 0) {
+      lines.push(`SIMILARITY MATCHES: ${report.similarityMatches.length}`);
+      report.similarityMatches.forEach((m) => {
+        lines.push(`  ${anonymizeId(m.reportId)} — ${Math.round(m.similarity)}% (${m.matchType})`);
+      });
+    } else {
+      lines.push(`SIMILARITY MATCHES: None (unique)`);
+    }
+    lines.push(``);
+    const rs = report.redactionSummary as { totalRedactions: number; categories: Record<string, number> } | undefined;
+    if (rs && rs.totalRedactions > 0) {
+      lines.push(`REDACTIONS: ${rs.totalRedactions} total`);
+      Object.entries(rs.categories).forEach(([cat, count]) => {
+        lines.push(`  ${REDACTION_LABELS[cat] || cat}: ${count}`);
+      });
+      lines.push(``);
+    }
+    if (report.feedback && report.feedback.length > 0) {
+      lines.push(`HEURISTIC FEEDBACK:`);
+      report.feedback.forEach((f) => lines.push(`  • ${f}`));
+      lines.push(``);
+    }
+    if (report.llmFeedback && report.llmFeedback.length > 0) {
+      lines.push(`LLM FEEDBACK:`);
+      report.llmFeedback.forEach((f) => lines.push(`  • ${f}`));
+      lines.push(``);
+    }
+    lines.push(`---`);
+    lines.push(`Report: ${window.location.href}`);
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vulnrap-report-${anonymizeId(id)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported", description: "Text report downloaded." });
   };
 
   const { data: report, isLoading, isError } = useGetReport(id, {
@@ -285,6 +359,9 @@ export default function Results() {
   const sectionMatches = report.sectionMatches as Array<{ sectionTitle: string; matchedReportId: number; matchedSectionTitle: string; similarity: number }> | undefined;
   const redactionSummary = report.redactionSummary as { totalRedactions: number; categories: Record<string, number> } | undefined;
 
+  const slopColor = getSlopColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+  const slopProgressColor = getSlopProgressColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 sm:pb-6">
@@ -303,10 +380,18 @@ export default function Results() {
             </span>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={copyLink} className="gap-2 glass-card hover:border-primary/30">
             <Copy className="w-4 h-4" />
             Share Link
+          </Button>
+          <Button variant="outline" onClick={exportJSON} className="gap-2 glass-card hover:border-primary/30">
+            <Download className="w-4 h-4" />
+            JSON
+          </Button>
+          <Button variant="outline" onClick={exportText} className="gap-2 glass-card hover:border-primary/30">
+            <Download className="w-4 h-4" />
+            TXT
           </Button>
           {deleteToken && (
             <Button
@@ -319,6 +404,7 @@ export default function Results() {
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           )}
+          <SettingsButton />
         </div>
       </div>
       <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent -mt-4" />
@@ -372,7 +458,7 @@ export default function Results() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
-            <div className={`text-7xl font-bold font-mono tracking-tighter ${getSlopColor(report.slopScore)} glow-text`}>
+            <div className={`text-7xl font-bold font-mono tracking-tighter ${slopColor} glow-text`}>
               {report.slopScore}
             </div>
             <div className="mt-4 text-xl font-medium tracking-wide uppercase">
@@ -383,7 +469,7 @@ export default function Results() {
                 <span>0 (Human)</span>
                 <span>100 (Pure AI Slop)</span>
               </div>
-              <Progress value={report.slopScore} className="h-2" indicatorClassName={getSlopProgressColor(report.slopScore)} />
+              <Progress value={report.slopScore} className="h-2" indicatorClassName={slopProgressColor} />
             </div>
             {report.llmEnhanced && report.llmSlopScore != null && (
               <div className="w-full max-w-md mt-5 grid grid-cols-2 gap-3">
@@ -392,7 +478,7 @@ export default function Results() {
                     <Cpu className="w-2.5 h-2.5" />
                     Heuristic
                   </div>
-                  <div className={`text-lg font-bold font-mono ${getSlopColor(report.slopScore)}`}>
+                  <div className={`text-lg font-bold font-mono ${getSlopColorCustom(Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4), settings.slopThresholdLow, settings.slopThresholdHigh)}`}>
                     {Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4)}
                   </div>
                 </div>
@@ -401,7 +487,7 @@ export default function Results() {
                     <Brain className="w-2.5 h-2.5" />
                     LLM
                   </div>
-                  <div className={`text-lg font-bold font-mono ${getSlopColor(report.llmSlopScore)}`}>
+                  <div className={`text-lg font-bold font-mono ${getSlopColorCustom(report.llmSlopScore, settings.slopThresholdLow, settings.slopThresholdHigh)}`}>
                     {report.llmSlopScore}
                   </div>
                 </div>
@@ -469,7 +555,7 @@ export default function Results() {
                 <span>Report {verification.reportCode}</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Score: <span className={getSlopColor(verification.slopScore)}>{verification.slopScore}/100</span> ({verification.slopTier})
+                Score: <span className={getSlopColorCustom(verification.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh)}>{verification.slopScore}/100</span> ({verification.slopTier})
                 {" | "}{verification.similarityMatchCount} similar report{verification.similarityMatchCount !== 1 ? "s" : ""}
                 {" | "}{verification.sectionMatchCount} section match{verification.sectionMatchCount !== 1 ? "es" : ""}
               </div>
@@ -539,16 +625,16 @@ export default function Results() {
                         Match <span className="text-primary glow-text-sm">{anonymizeId(match.reportId)}</span>
                       </span>
                       <div className="flex items-center gap-2">
-                        <Badge variant={match.similarity > 80 ? "destructive" : "secondary"}>
+                        <Badge variant={match.similarity >= settings.similarityThreshold ? "destructive" : "secondary"}>
                           {match.matchType}
                         </Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <Progress value={match.similarity} className="flex-1 h-2" indicatorClassName={match.similarity > 80 ? "bg-destructive" : "bg-primary"} />
+                      <Progress value={match.similarity} className="flex-1 h-2" indicatorClassName={match.similarity >= settings.similarityThreshold ? "bg-destructive" : "bg-primary"} />
                       <span className="font-mono text-sm w-12 text-right">{Math.round(match.similarity)}%</span>
                     </div>
-                    {match.similarity > 80 && (
+                    {match.similarity >= settings.similarityThreshold && (
                       <p className="text-xs text-destructive/80 italic pl-1">High similarity -- this may be a duplicate of a previously reported vulnerability.</p>
                     )}
                     <Button
@@ -567,6 +653,7 @@ export default function Results() {
                         matchId={match.reportId}
                         matchSimilarity={match.similarity}
                         matchType={match.matchType}
+                        settings={settings}
                       />
                     )}
                   </div>
