@@ -196,6 +196,8 @@ export const CompareReportsResponse = zod.object({
       ),
     slopScore: zod.number(),
     slopTier: zod.string(),
+    contentMode: zod.enum(["full", "similarity_only"]),
+    sectionHashes: zod.record(zod.string(), zod.string()).optional(),
     createdAt: zod.coerce.date(),
   }),
   matchedReport: zod.object({
@@ -209,12 +211,36 @@ export const CompareReportsResponse = zod.object({
       ),
     slopScore: zod.number(),
     slopTier: zod.string(),
+    contentMode: zod.enum(["full", "similarity_only"]),
+    sectionHashes: zod.record(zod.string(), zod.string()).optional(),
     createdAt: zod.coerce.date(),
   }),
   similarity: zod
     .number()
     .describe("Similarity percentage between the two reports"),
   matchType: zod.string(),
+  sectionComparison: zod
+    .array(
+      zod.object({
+        sectionTitle: zod.string(),
+        status: zod
+          .enum(["identical", "different", "unique"])
+          .describe(
+            "Whether this section is identical, different, or only in one report",
+          ),
+        sourceHash: zod.string().nullish(),
+        matchedHash: zod.string().nullish(),
+      }),
+    )
+    .describe(
+      "Section-by-section comparison showing identical, different, and unique sections",
+    ),
+  identicalSections: zod
+    .number()
+    .describe("Number of sections with identical content"),
+  totalSections: zod
+    .number()
+    .describe("Total unique sections across both reports"),
 });
 
 /**

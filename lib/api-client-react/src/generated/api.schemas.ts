@@ -227,20 +227,17 @@ export interface SlopDistribution {
   totalReports: number;
 }
 
-export type ReportComparisonSourceReport = {
-  id: number;
-  reportCode: string;
-  /**
-   * First 2000 chars of redacted text (null if similarity_only mode)
-   * @nullable
-   */
-  snippet?: string | null;
-  slopScore: number;
-  slopTier: string;
-  createdAt: string;
-};
+export type ComparisonReportDetailContentMode =
+  (typeof ComparisonReportDetailContentMode)[keyof typeof ComparisonReportDetailContentMode];
 
-export type ReportComparisonMatchedReport = {
+export const ComparisonReportDetailContentMode = {
+  full: "full",
+  similarity_only: "similarity_only",
+} as const;
+
+export type ComparisonReportDetailSectionHashes = { [key: string]: string };
+
+export interface ComparisonReportDetail {
   id: number;
   reportCode: string;
   /**
@@ -250,15 +247,45 @@ export type ReportComparisonMatchedReport = {
   snippet?: string | null;
   slopScore: number;
   slopTier: string;
+  contentMode: ComparisonReportDetailContentMode;
+  sectionHashes?: ComparisonReportDetailSectionHashes;
   createdAt: string;
-};
+}
+
+/**
+ * Whether this section is identical, different, or only in one report
+ */
+export type SectionComparisonItemStatus =
+  (typeof SectionComparisonItemStatus)[keyof typeof SectionComparisonItemStatus];
+
+export const SectionComparisonItemStatus = {
+  identical: "identical",
+  different: "different",
+  unique: "unique",
+} as const;
+
+export interface SectionComparisonItem {
+  sectionTitle: string;
+  /** Whether this section is identical, different, or only in one report */
+  status: SectionComparisonItemStatus;
+  /** @nullable */
+  sourceHash?: string | null;
+  /** @nullable */
+  matchedHash?: string | null;
+}
 
 export interface ReportComparison {
-  sourceReport: ReportComparisonSourceReport;
-  matchedReport: ReportComparisonMatchedReport;
+  sourceReport: ComparisonReportDetail;
+  matchedReport: ComparisonReportDetail;
   /** Similarity percentage between the two reports */
   similarity: number;
   matchType: string;
+  /** Section-by-section comparison showing identical, different, and unique sections */
+  sectionComparison: SectionComparisonItem[];
+  /** Number of sections with identical content */
+  identicalSections: number;
+  /** Total unique sections across both reports */
+  totalSections: number;
 }
 
 export interface SubmitFeedbackBody {

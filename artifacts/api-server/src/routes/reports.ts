@@ -23,7 +23,7 @@ import { analyzeSloppiness } from "../lib/sloppiness";
 import { analyzeSlopWithLLM, blendSlopScores, getSlopTier, isLLMAvailable } from "../lib/llm-slop";
 import { redactReport } from "../lib/redactor";
 import { parseSections, findSectionMatches } from "../lib/section-parser";
-import { sanitizeText, sanitizeFileName } from "../lib/sanitize";
+import { sanitizeText, sanitizeFileName, detectBinaryContent } from "../lib/sanitize";
 import { extractTextFromPdf } from "../lib/pdf";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -211,6 +211,10 @@ router.post("/reports", async (req, res): Promise<void> => {
       }
       text = sanitizeText(pdfResult.text);
     } else {
+      if (detectBinaryContent(req.file.buffer)) {
+        res.status(400).json({ error: "File appears to contain binary content. Only plain text (.txt, .md) and PDF files are accepted." });
+        return;
+      }
       text = sanitizeText(req.file.buffer.toString("utf-8"));
     }
     safeFileName = req.file.originalname ? sanitizeFileName(req.file.originalname) : null;
@@ -418,6 +422,10 @@ router.post("/reports/check", async (req, res): Promise<void> => {
       }
       text = sanitizeText(pdfResult.text);
     } else {
+      if (detectBinaryContent(req.file.buffer)) {
+        res.status(400).json({ error: "File appears to contain binary content. Only plain text (.txt, .md) and PDF files are accepted." });
+        return;
+      }
       text = sanitizeText(req.file.buffer.toString("utf-8"));
     }
   } else if (reportUrl.length > 0) {
@@ -601,16 +609,20 @@ router.get("/reports/:id/compare/:matchId", async (req, res): Promise<void> => {
     db.select({
       id: reportsTable.id,
       redactedText: reportsTable.redactedText,
+      contentMode: reportsTable.contentMode,
       slopScore: reportsTable.slopScore,
       slopTier: reportsTable.slopTier,
       similarityMatches: reportsTable.similarityMatches,
+      sectionHashes: reportsTable.sectionHashes,
       createdAt: reportsTable.createdAt,
     }).from(reportsTable).where(eq(reportsTable.id, params.data.id)),
     db.select({
       id: reportsTable.id,
       redactedText: reportsTable.redactedText,
+      contentMode: reportsTable.contentMode,
       slopScore: reportsTable.slopScore,
       slopTier: reportsTable.slopTier,
+      sectionHashes: reportsTable.sectionHashes,
       createdAt: reportsTable.createdAt,
     }).from(reportsTable).where(eq(reportsTable.id, params.data.matchId)),
   ]);
@@ -637,6 +649,35 @@ router.get("/reports/:id/compare/:matchId", async (req, res): Promise<void> => {
 
   const snippetLength = 2000;
 
+  const srcSections = (src.sectionHashes as Record<string, string>) || {};
+  const mtchSections = (mtch.sectionHashes as Record<string, string>) || {};
+  const allSectionTitles = new Set([
+    ...Object.keys(srcSections).filter(k => k !== "__full_document"),
+    ...Object.keys(mtchSections).filter(k => k !== "__full_document"),
+  ]);
+
+  const sectionComparison: Array<{ sectionTitle: string; status: string; sourceHash: string | null; matchedHash: string | null }> = [];
+  let identicalCount = 0;
+
+  for (const title of allSectionTitles) {
+    const srcHash = srcSections[title] || null;
+    const mtchHash = mtchSections[title] || null;
+
+    let status: string;
+    if (srcHash && mtchHash) {
+      if (srcHash === mtchHash) {
+        status = "identical";
+        identicalCount++;
+      } else {
+        status = "different";
+      }
+    } else {
+      status = "unique";
+    }
+
+    sectionComparison.push({ sectionTitle: title, status, sourceHash: srcHash, matchedHash: mtchHash });
+  }
+
   const response = CompareReportsResponse.parse({
     sourceReport: {
       id: src.id,
@@ -644,6 +685,8 @@ router.get("/reports/:id/compare/:matchId", async (req, res): Promise<void> => {
       snippet: src.redactedText ? src.redactedText.slice(0, snippetLength) : null,
       slopScore: src.slopScore,
       slopTier: src.slopTier,
+      contentMode: src.contentMode,
+      sectionHashes: srcSections,
       createdAt: src.createdAt,
     },
     matchedReport: {
@@ -652,10 +695,15 @@ router.get("/reports/:id/compare/:matchId", async (req, res): Promise<void> => {
       snippet: mtch.redactedText ? mtch.redactedText.slice(0, snippetLength) : null,
       slopScore: mtch.slopScore,
       slopTier: mtch.slopTier,
+      contentMode: mtch.contentMode,
+      sectionHashes: mtchSections,
       createdAt: mtch.createdAt,
     },
-    similarity: matchInfo?.similarity ?? 0,
-    matchType: matchInfo?.matchType ?? "unknown",
+    similarity: matchInfo.similarity,
+    matchType: matchInfo.matchType,
+    sectionComparison,
+    identicalSections: identicalCount,
+    totalSections: allSectionTitles.size,
   });
 
   res.json(response);

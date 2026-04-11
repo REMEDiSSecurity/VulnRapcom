@@ -9,6 +9,9 @@ export function sanitizeText(input: string): string {
 
   text = text.replace(/<script[\s\S]*?<\/script>/gi, "[removed-script]");
   text = text.replace(/<style[\s\S]*?<\/style>/gi, "[removed-style]");
+  text = text.replace(/on\w+\s*=\s*["'][^"']*["']/gi, "[removed-event-handler]");
+  text = text.replace(/javascript\s*:/gi, "[removed-js-uri]");
+  text = text.replace(/data\s*:\s*text\/html/gi, "[removed-data-uri]");
 
   text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
   text = text.replace(/\0/g, "");
@@ -25,6 +28,15 @@ export function sanitizeFileName(name: string): string {
     .replace(/\.{2,}/g, ".")
     .replace(/^\.+/, "")
     .substring(0, 255);
+}
+
+export function detectBinaryContent(buffer: Buffer): boolean {
+  const sampleSize = Math.min(buffer.length, 8192);
+  let nullCount = 0;
+  for (let i = 0; i < sampleSize; i++) {
+    if (buffer[i] === 0) nullCount++;
+  }
+  return nullCount / sampleSize > 0.1;
 }
 
 export function safeJsonParse<T = unknown>(input: string): T | null {

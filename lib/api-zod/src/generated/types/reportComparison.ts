@@ -5,13 +5,19 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 0.1.0
  */
-import type { ReportComparisonMatchedReport } from "./reportComparisonMatchedReport";
-import type { ReportComparisonSourceReport } from "./reportComparisonSourceReport";
+import type { ComparisonReportDetail } from "./comparisonReportDetail";
+import type { SectionComparisonItem } from "./sectionComparisonItem";
 
 export interface ReportComparison {
-  sourceReport: ReportComparisonSourceReport;
-  matchedReport: ReportComparisonMatchedReport;
+  sourceReport: ComparisonReportDetail;
+  matchedReport: ComparisonReportDetail;
   /** Similarity percentage between the two reports */
   similarity: number;
   matchType: string;
+  /** Section-by-section comparison showing identical, different, and unique sections */
+  sectionComparison: SectionComparisonItem[];
+  /** Number of sections with identical content */
+  identicalSections: number;
+  /** Total unique sections across both reports */
+  totalSections: number;
 }

@@ -751,65 +751,86 @@ components:
         - buckets
         - totalReports
 
+    ComparisonReportDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        reportCode:
+          type: string
+        snippet:
+          type: ["string", "null"]
+          description: First 2000 chars of redacted text (null if similarity_only mode)
+        slopScore:
+          type: integer
+        slopTier:
+          type: string
+        contentMode:
+          type: string
+          enum: [full, similarity_only]
+        sectionHashes:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - reportCode
+        - slopScore
+        - slopTier
+        - contentMode
+        - createdAt
+
+    SectionComparisonItem:
+      type: object
+      properties:
+        sectionTitle:
+          type: string
+        status:
+          type: string
+          enum: [identical, different, unique]
+          description: Whether this section is identical, different, or only in one report
+        sourceHash:
+          type: ["string", "null"]
+        matchedHash:
+          type: ["string", "null"]
+      required:
+        - sectionTitle
+        - status
+
     ReportComparison:
       type: object
       properties:
         sourceReport:
-          type: object
-          properties:
-            id:
-              type: integer
-            reportCode:
-              type: string
-            snippet:
-              type: ["string", "null"]
-              description: First 2000 chars of redacted text (null if similarity_only mode)
-            slopScore:
-              type: integer
-            slopTier:
-              type: string
-            createdAt:
-              type: string
-              format: date-time
-          required:
-            - id
-            - reportCode
-            - slopScore
-            - slopTier
-            - createdAt
+          $ref: "#/components/schemas/ComparisonReportDetail"
         matchedReport:
-          type: object
-          properties:
-            id:
-              type: integer
-            reportCode:
-              type: string
-            snippet:
-              type: ["string", "null"]
-              description: First 2000 chars of redacted text (null if similarity_only mode)
-            slopScore:
-              type: integer
-            slopTier:
-              type: string
-            createdAt:
-              type: string
-              format: date-time
-          required:
-            - id
-            - reportCode
-            - slopScore
-            - slopTier
-            - createdAt
+          $ref: "#/components/schemas/ComparisonReportDetail"
         similarity:
           type: integer
           description: Similarity percentage between the two reports
         matchType:
           type: string
+        sectionComparison:
+          type: array
+          items:
+            $ref: "#/components/schemas/SectionComparisonItem"
+          description: Section-by-section comparison showing identical, different, and unique sections
+        identicalSections:
+          type: integer
+          description: Number of sections with identical content
+        totalSections:
+          type: integer
+          description: Total unique sections across both reports
       required:
         - sourceReport
         - matchedReport
         - similarity
         - matchType
+        - sectionComparison
+        - identicalSections
+        - totalSections
 
     SubmitFeedbackBody:
       type: object

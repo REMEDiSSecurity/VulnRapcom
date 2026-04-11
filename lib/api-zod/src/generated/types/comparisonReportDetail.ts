@@ -5,8 +5,10 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 0.1.0
  */
+import type { ComparisonReportDetailContentMode } from "./comparisonReportDetailContentMode";
+import type { ComparisonReportDetailSectionHashes } from "./comparisonReportDetailSectionHashes";
 
-export type ReportComparisonMatchedReport = {
+export interface ComparisonReportDetail {
   id: number;
   reportCode: string;
   /**
@@ -16,5 +18,7 @@ export type ReportComparisonMatchedReport = {
   snippet?: string | null;
   slopScore: number;
   slopTier: string;
+  contentMode: ComparisonReportDetailContentMode;
+  sectionHashes?: ComparisonReportDetailSectionHashes;
   createdAt: Date;
-};
+}

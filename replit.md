@@ -84,12 +84,15 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Graceful fallback to heuristic-only when LLM unavailable/timeout (20s)
 
 ### Input Sanitization (`artifacts/api-server/src/lib/sanitize.ts`)
-- HTML tag stripping (script, style, all tags)
+- Script/style tag stripping with placeholder markers
+- Event handler attribute removal (onclick, onerror, etc.)
+- JavaScript URI and data URI neutralization
 - Control character removal
 - Excessive whitespace/newline collapsing
 - Max input length guard (20MB)
+- Binary content detection for file uploads
 - Safe JSON parsing with prototype pollution protection
-- Filename sanitization (path traversal prevention)
+- Filename sanitization (path traversal prevention, leading dot stripping)
 
 ### Upload Pipeline
 1. User uploads .txt/.md file OR pastes text directly (plain text only, sanitized server-side)
@@ -122,7 +125,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `POST /api/reports/check` — Check a report without storing (receiver flow, read-only analysis)
 - `GET /api/reports/:id` — Get report analysis results (includes redacted text, section hashes, redaction summary)
 - `GET /api/reports/:id/verify` — Lightweight verification badge data (slop score, match counts, verify URL)
-- `GET /api/reports/:id/compare/:matchId` — Side-by-side comparison of two reports (redacted text snippets, scores, metadata)
+- `GET /api/reports/:id/compare/:matchId` — Side-by-side comparison of two reports (redacted text snippets, scores, section comparison map, content modes). Access-controlled: only returns data when reports have an existing similarity relationship.
 - `GET /api/reports/lookup/:hash` — Look up by SHA-256 hash
 - `GET /api/stats` — Platform-wide statistics
 - `GET /api/stats/recent` — Recent submission activity

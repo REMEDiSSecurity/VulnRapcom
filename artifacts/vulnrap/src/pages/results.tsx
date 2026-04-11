@@ -83,6 +83,12 @@ function removeDeleteToken(reportId: number) {
   } catch {}
 }
 
+function SectionStatusBadge({ status }: { status: string }) {
+  if (status === "identical") return <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">Identical</Badge>;
+  if (status === "different") return <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">Different</Badge>;
+  return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">Unique</Badge>;
+}
+
 function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string }) {
   const { data: comparison, isLoading, isError } = useCompareReports(reportId, matchId, {
     query: { enabled: true, queryKey: getCompareReportsQueryKey(reportId, matchId) },
@@ -106,16 +112,43 @@ function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { repor
 
   const src = comparison.sourceReport;
   const mtch = comparison.matchedReport;
+  const sections = comparison.sectionComparison || [];
+  const identical = comparison.identicalSections ?? 0;
+  const total = comparison.totalSections ?? 0;
 
   return (
     <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+      {total > 0 && (
+        <div className="flex items-center gap-2 text-xs">
+          <Layers className="w-3.5 h-3.5 text-primary" />
+          <span className="font-medium">Section Map:</span>
+          <span className={identical > 0 ? "text-destructive font-bold" : "text-green-400"}>
+            {identical} of {total} sections identical
+          </span>
+        </div>
+      )}
+
+      {sections.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {sections.map((sec) => (
+            <div key={sec.sectionTitle} className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{sec.sectionTitle}</span>
+              <SectionStatusBadge status={sec.status} />
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Your Report ({src.reportCode})</span>
-            <Badge variant="outline" className="text-[10px]">
-              Score: <span className={getSlopColor(src.slopScore)}>{src.slopScore}</span>
-            </Badge>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="text-[10px]">
+                Score: <span className={getSlopColor(src.slopScore)}>{src.slopScore}</span>
+              </Badge>
+              <Badge variant="outline" className="text-[9px] text-muted-foreground">{src.contentMode === "similarity_only" ? "hash only" : "full"}</Badge>
+            </div>
           </div>
           <div className="glass-card rounded-lg p-3 max-h-64 overflow-y-auto">
             {src.snippet ? (
@@ -128,9 +161,12 @@ function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { repor
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Matched Report ({mtch.reportCode})</span>
-            <Badge variant="outline" className="text-[10px]">
-              Score: <span className={getSlopColor(mtch.slopScore)}>{mtch.slopScore}</span>
-            </Badge>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="text-[10px]">
+                Score: <span className={getSlopColor(mtch.slopScore)}>{mtch.slopScore}</span>
+              </Badge>
+              <Badge variant="outline" className="text-[9px] text-muted-foreground">{mtch.contentMode === "similarity_only" ? "hash only" : "full"}</Badge>
+            </div>
           </div>
           <div className="glass-card rounded-lg p-3 max-h-64 overflow-y-auto">
             {mtch.snippet ? (
