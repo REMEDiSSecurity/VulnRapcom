@@ -332,7 +332,7 @@ export default function Home() {
         </CardHeader>
         <CardContent className="space-y-6 sm:space-y-8">
           <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-yellow-500">Heads up:</strong> We auto-redact PII, secrets, credentials, and company names before storing or comparing your report. If your report contains sensitive details, pre-sanitize those sections yourself before uploading.
+            <strong className="text-yellow-500">Heads up:</strong> We try to auto-redact PII, secrets, credentials, and company names before storing or comparing your report. If your report contains sensitive details, pre-sanitize those sections yourself before uploading.
           </div>
           <div className="flex rounded-xl overflow-hidden glass-card">
             <button
