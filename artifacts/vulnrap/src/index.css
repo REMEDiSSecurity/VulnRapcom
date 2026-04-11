@@ -443,7 +443,7 @@
 .laser-beam {
   position: absolute;
   left: 50%;
-  top: 180px;
+  top: var(--beam-origin-y, 180px);
   width: 1px;
   height: 300vh;
   margin-top: -150vh;
