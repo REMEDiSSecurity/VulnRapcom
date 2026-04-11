@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X, Link2, ChevronDown, Play } from "lucide-react";
+import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X, Link2, ChevronDown, Play, AlertTriangle } from "lucide-react";
 import { LogoBeams } from "@/components/laser-effects";
 import { useSubmitReport, SubmitReportBodyContentMode, useGetReportFeed } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,110 @@ function validateFile(file: File): string | null {
     return "File is empty. Please select a file with content.";
   }
   return null;
+}
+
+const redactionCategories = [
+  {
+    label: "Personal Information",
+    color: "text-red-400",
+    items: [
+      { what: "Email addresses", example: "user@company.com", replacement: "[REDACTED_EMAIL]" },
+      { what: "Phone numbers", example: "+1 (555) 123-4567", replacement: "[REDACTED_PHONE]" },
+      { what: "Social Security numbers", example: "123-45-6789", replacement: "[REDACTED_SSN]" },
+      { what: "Credit card numbers", example: "4111 1111 1111 1111", replacement: "[REDACTED_CARD]" },
+      { what: "Usernames & attributions", example: "reported by: jdoe", replacement: "[REDACTED_USERNAME]" },
+    ],
+  },
+  {
+    label: "Secrets & Credentials",
+    color: "text-orange-400",
+    items: [
+      { what: "API keys & tokens", example: "api_key: sk_live_abc123...", replacement: "[REDACTED_API_KEY]" },
+      { what: "Bearer tokens", example: "Bearer eyJhbG...", replacement: "Bearer [REDACTED_TOKEN]" },
+      { what: "JWTs", example: "eyJhbG...eyJzdW...sig", replacement: "[REDACTED_JWT]" },
+      { what: "AWS access keys", example: "AKIAIOSFODNN7...", replacement: "[REDACTED_AWS_KEY]" },
+      { what: "Private keys (RSA/EC)", example: "-----BEGIN PRIVATE KEY-----", replacement: "[REDACTED_PRIVATE_KEY]" },
+      { what: "Passwords", example: "password: hunter2", replacement: "[REDACTED_PASSWORD]" },
+      { what: "Hex secrets", example: "secret: a1b2c3d4e5f6...", replacement: "[REDACTED_SECRET]" },
+    ],
+  },
+  {
+    label: "Infrastructure",
+    color: "text-cyan-400",
+    items: [
+      { what: "IPv4 addresses", example: "192.168.1.100", replacement: "[REDACTED_IP]" },
+      { what: "IPv6 addresses", example: "2001:0db8:85a3::8a2e", replacement: "[REDACTED_IP]" },
+      { what: "Connection strings", example: "postgres://user:pass@host/db", replacement: "[REDACTED_CONNECTION_STRING]" },
+      { what: "URLs with credentials", example: "https://admin:pass@host", replacement: "[REDACTED_URL_WITH_CREDS]" },
+      { what: "Internal hostnames", example: "dev1.corp.internal", replacement: "[REDACTED_HOSTNAME]" },
+      { what: "Internal/private URLs", example: "http://10.0.0.1:8080/admin", replacement: "[REDACTED_INTERNAL_URL]" },
+      { what: "UUIDs", example: "550e8400-e29b-41d4-a716-...", replacement: "[REDACTED_UUID]" },
+    ],
+  },
+  {
+    label: "Organization",
+    color: "text-purple-400",
+    items: [
+      { what: "Company names", example: "...at Acme Corp", replacement: "[REDACTED_COMPANY] Corp" },
+    ],
+  },
+];
+
+function AutoRedactionCard() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`feature-card rounded-xl glass-card transition-all duration-300 ${expanded ? "sm:col-span-3" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-start gap-3 p-4 sm:p-5 w-full text-left cursor-pointer"
+      >
+        <div className="p-2 sm:p-2.5 rounded-lg icon-glow-green flex-shrink-0">
+          <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-bold mb-1 flex items-center gap-2">
+            Auto-Redaction
+            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, and company names are scrubbed before storage or comparison. Tap to see exactly what we catch.</p>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Redaction is regex-based, not AI-powered. It catches common patterns but <strong className="text-foreground">cannot guarantee</strong> every sensitive value is removed. Unusual formats, obfuscated data, or context-dependent secrets may slip through. Always pre-sanitize anything truly sensitive before uploading.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {redactionCategories.map((cat) => (
+              <div key={cat.label} className="space-y-2">
+                <h4 className={`text-xs font-bold ${cat.color}`}>{cat.label}</h4>
+                <div className="space-y-1.5">
+                  {cat.items.map((item) => (
+                    <div key={item.what} className="rounded-md bg-muted/30 px-2.5 py-1.5">
+                      <p className="text-xs font-medium text-foreground">{item.what}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono truncate mt-0.5" title={item.example}>{item.example}</p>
+                      <p className="text-[10px] text-green-400/80 font-mono mt-0.5">→ {item.replacement}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-border/50 pt-3">
+            All patterns are applied in order. Company names are detected by suffix (Inc, Corp, LLC, Ltd, etc.). Usernames are caught in key-value pairs (<code className="text-[10px] bg-muted/50 px-1 rounded">username: jdoe</code>) and attribution lines (<code className="text-[10px] bg-muted/50 px-1 rounded">reported by: Jane</code>). Redaction happens server-side before any text is stored or compared.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function VideoSection() {
@@ -292,15 +396,7 @@ export default function Home() {
       <VideoSection />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
-          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-green flex-shrink-0">
-            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold mb-1">Auto-Redaction</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, and company names are scrubbed before storage or comparison.</p>
-          </div>
-        </div>
+        <AutoRedactionCard />
         <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
           <div className="p-2 sm:p-2.5 rounded-lg icon-glow-cyan flex-shrink-0">
             <Fingerprint className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
