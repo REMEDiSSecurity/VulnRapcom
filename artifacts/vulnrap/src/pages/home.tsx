@@ -165,6 +165,269 @@ function AutoRedactionCard() {
   );
 }
 
+const similarityMethods = [
+  {
+    label: "MinHash + Jaccard",
+    color: "text-cyan-400",
+    description: "Estimates set similarity between documents using randomized hashing.",
+    details: [
+      "Text is normalized (lowercased, whitespace collapsed) and split into 5-word shingles (sliding windows)",
+      "Each shingle is hashed with MD5, then 128 independent hash functions produce a MinHash signature",
+      "Two signatures are compared by counting matching positions — the ratio approximates Jaccard similarity",
+      "Fast O(n) comparison regardless of document length",
+    ],
+  },
+  {
+    label: "SimHash",
+    color: "text-blue-400",
+    description: "Produces a 64-bit fingerprint that preserves structural similarity.",
+    details: [
+      "Each word is hashed with SHA-256, then bits are weighted (+1 or −1) across a 64-position vector",
+      "Final fingerprint is the sign of each position — similar documents produce similar bit patterns",
+      "Compared using Hamming distance (count of differing bits), converted to a 0–100% similarity score",
+      "Good at catching structurally similar reports even when word choices differ",
+    ],
+  },
+  {
+    label: "LSH Banding",
+    color: "text-green-400",
+    description: "Locality-Sensitive Hashing narrows the search space before full comparison.",
+    details: [
+      "The 128-value MinHash signature is divided into 16 bands of 8 rows each",
+      "Each band is hashed independently — if any band matches between two reports, they become candidates",
+      "Candidates get full Jaccard + SimHash comparison; non-candidates are skipped entirely",
+      "This makes similarity search sub-linear: we avoid comparing every report against every other report",
+    ],
+  },
+  {
+    label: "Section-Level Hashing",
+    color: "text-purple-400",
+    description: "Each section of your report is hashed and compared independently.",
+    details: [
+      "Reports are split by Markdown headers (# / ## / ### / ####), or by paragraph breaks if unstructured",
+      "Each section is SHA-256 hashed after normalization — identical sections produce identical hashes",
+      "Sections are weighted by type: high-value (vulnerability, PoC, impact), medium (environment, scope), or standard",
+      "Detects when someone copies a specific section (e.g. the same PoC) even if the rest of the report differs",
+    ],
+  },
+  {
+    label: "Content Hash",
+    color: "text-yellow-400",
+    description: "SHA-256 of the full document for exact-match deduplication.",
+    details: [
+      "A single SHA-256 hash of the entire report text",
+      "If two reports produce the same hash, they are byte-for-byte identical (after redaction)",
+      "Used as a fast first-pass check before running heavier similarity algorithms",
+    ],
+  },
+];
+
+const matchTypes = [
+  { type: "Near-duplicate", threshold: "Jaccard ≥ 80% or LSH candidate + Jaccard ≥ 60%", color: "text-red-400" },
+  { type: "High-similarity", threshold: "Jaccard ≥ 50%", color: "text-orange-400" },
+  { type: "Structural", threshold: "SimHash ≥ 80%", color: "text-yellow-400" },
+  { type: "Semantic", threshold: "Combined ≥ 15% (catch-all)", color: "text-muted-foreground" },
+];
+
+function SectionHashingCard() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`feature-card rounded-xl glass-card transition-all duration-300 ${expanded ? "sm:col-span-3" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-start gap-3 p-4 sm:p-5 w-full text-left cursor-pointer"
+      >
+        <div className="p-2 sm:p-2.5 rounded-lg icon-glow-cyan flex-shrink-0">
+          <Fingerprint className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-bold mb-1 flex items-center gap-2">
+            Section Hashing
+            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">Each section is hashed independently, detecting partial matches across reports. Tap to see how.</p>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="rounded-lg bg-cyan-500/5 border border-cyan-500/20 px-3 py-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We use five complementary algorithms to detect similarity. No single method catches everything — combining them reduces false negatives while keeping false positives low.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {similarityMethods.map((method) => (
+              <div key={method.label} className="space-y-2 rounded-lg bg-muted/20 p-3">
+                <h4 className={`text-xs font-bold ${method.color}`}>{method.label}</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{method.description}</p>
+                <ul className="space-y-1">
+                  {method.details.map((detail, i) => (
+                    <li key={i} className="text-[10px] text-muted-foreground leading-relaxed flex gap-1.5">
+                      <span className={`mt-1 w-1 h-1 rounded-full ${method.color.replace("text-", "bg-")} flex-shrink-0`} />
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-border/50 pt-3 space-y-2">
+            <h4 className="text-xs font-bold text-foreground">Match Classification</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {matchTypes.map((mt) => (
+                <div key={mt.type} className="rounded-md bg-muted/30 px-2.5 py-1.5">
+                  <p className={`text-[11px] font-medium ${mt.color}`}>{mt.type}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{mt.threshold}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              The final similarity score is the maximum of Jaccard and SimHash scores. Only reports exceeding the 15% threshold appear in results. Top 10 matches are returned, sorted by similarity.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const slopSignals = [
+  {
+    label: "AI Phrase Detection",
+    color: "text-violet-400",
+    description: "Scans for 30+ phrases that are hallmarks of AI-generated text.",
+    phrases: [
+      "it is important to note", "delve into", "comprehensive analysis", "in today's digital landscape",
+      "robust security", "multifaceted", "paramount", "holistic approach", "meticulous",
+      "it's crucial to", "represents a significant", "proactive measures",
+    ],
+    scoring: "1 phrase = +5 pts, 3+ = +15 pts, 5+ = +30 pts",
+  },
+  {
+    label: "Structure Quality",
+    color: "text-cyan-400",
+    description: "Checks for technical elements that real vulnerability reports include.",
+    checks: [
+      { what: "Software version", points: "+8 if missing", example: "version 2.4.1" },
+      { what: "Affected component/path", points: "+8 if missing", example: "/api/auth/login" },
+      { what: "Reproduction steps", points: "+10 if missing", example: "Steps to reproduce" },
+      { what: "Code blocks or PoC", points: "+5 if missing", example: "```curl ...```" },
+      { what: "Attack vector / CVE / CWE", points: "+5 if missing", example: "CWE-79, network" },
+      { what: "Impact assessment", points: "+5 if missing", example: "severity: high" },
+      { what: "Expected vs. observed behavior", points: "+5 if missing", example: "should return 403" },
+    ],
+  },
+  {
+    label: "Writing Analysis",
+    color: "text-orange-400",
+    description: "Statistical analysis of writing style and document structure.",
+    checks: [
+      { what: "Report length", points: "<30 words: +25, <100: +10, >5000: +10", example: "Extremely short or padded" },
+      { what: "Average sentence length", points: "+8 if avg >30 words/sentence", example: "AI tends to write long sentences" },
+      { what: "Vocabulary diversity", points: "+10 if unique ratio <30%", example: "Repetitive, low-diversity language" },
+      { what: "Wall of text", points: "+5 if single paragraph >200 words", example: "No structure or formatting" },
+    ],
+  },
+];
+
+const slopTiers = [
+  { tier: "Probably Legit", range: "0–14", color: "text-green-400", bg: "bg-green-400/10" },
+  { tier: "Mildly Suspicious", range: "15–29", color: "text-yellow-400", bg: "bg-yellow-400/10" },
+  { tier: "Questionable", range: "30–49", color: "text-orange-400", bg: "bg-orange-400/10" },
+  { tier: "Highly Suspicious", range: "50–69", color: "text-red-400", bg: "bg-red-400/10" },
+  { tier: "Pure Slop", range: "70–100", color: "text-red-500", bg: "bg-red-500/10" },
+];
+
+function SlopDetectionCard() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={`feature-card rounded-xl glass-card transition-all duration-300 ${expanded ? "sm:col-span-3" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-start gap-3 p-4 sm:p-5 w-full text-left cursor-pointer"
+      >
+        <div className="p-2 sm:p-2.5 rounded-lg icon-glow-violet flex-shrink-0">
+          <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-bold mb-1 flex items-center gap-2">
+            Slop Detection
+            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">Linguistic analysis scores AI-generation likelihood with actionable feedback. Tap to see what we check.</p>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-3 py-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              The slop score is a penalty-based system (0–100). Points are added for each red flag found. Lower is better. The score is deterministic — the same input always produces the same score.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {slopSignals.map((signal) => (
+              <div key={signal.label} className="space-y-2 rounded-lg bg-muted/20 p-3">
+                <h4 className={`text-xs font-bold ${signal.color}`}>{signal.label}</h4>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{signal.description}</p>
+                {"phrases" in signal && (
+                  <>
+                    <div className="flex flex-wrap gap-1">
+                      {signal.phrases.map((phrase) => (
+                        <span key={phrase} className="text-[9px] bg-violet-500/10 text-violet-300 px-1.5 py-0.5 rounded font-mono">
+                          {phrase}
+                        </span>
+                      ))}
+                      <span className="text-[9px] text-muted-foreground px-1.5 py-0.5">+18 more...</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{signal.scoring}</p>
+                  </>
+                )}
+                {"checks" in signal && (
+                  <div className="space-y-1">
+                    {signal.checks.map((check) => (
+                      <div key={check.what} className="rounded-md bg-muted/30 px-2 py-1">
+                        <div className="flex justify-between items-baseline gap-2">
+                          <span className="text-[10px] font-medium text-foreground">{check.what}</span>
+                          <span className="text-[9px] text-orange-400/80 font-mono whitespace-nowrap">{check.points}</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">{check.example}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-border/50 pt-3 space-y-2">
+            <h4 className="text-xs font-bold text-foreground">Score Tiers</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {slopTiers.map((t) => (
+                <div key={t.tier} className={`rounded-md ${t.bg} px-2.5 py-1.5 text-center`}>
+                  <p className={`text-[11px] font-bold ${t.color}`}>{t.tier}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{t.range}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              This is heuristic analysis, not a definitive judgment. A high score means the report has characteristics commonly seen in AI-generated text — it does not prove the report was AI-written. A low score means the report looks like a human wrote it, not that the vulnerability is valid.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VideoSection() {
   const [open, setOpen] = useState(false);
 
@@ -397,24 +660,8 @@ export default function Home() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <AutoRedactionCard />
-        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
-          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-cyan flex-shrink-0">
-            <Fingerprint className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold mb-1">Section Hashing</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">Each section is hashed independently, detecting partial matches across reports.</p>
-          </div>
-        </div>
-        <div className="feature-card flex items-start gap-3 p-4 sm:p-5 rounded-xl glass-card">
-          <div className="p-2 sm:p-2.5 rounded-lg icon-glow-violet flex-shrink-0">
-            <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold mb-1">Slop Detection</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">Linguistic analysis scores AI-generation likelihood with actionable feedback.</p>
-          </div>
-        </div>
+        <SectionHashingCard />
+        <SlopDetectionCard />
       </div>
 
       <Card className="glass-card-accent rounded-xl overflow-hidden">
