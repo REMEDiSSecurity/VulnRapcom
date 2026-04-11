@@ -180,6 +180,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /reports/{id}/compare/{matchId}:
+    get:
+      operationId: compareReports
+      tags: [reports]
+      summary: Compare two reports side by side
+      description: Returns redacted text snippets of both reports for side-by-side similarity comparison
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: matchId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comparison data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportComparison"
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /reports/check:
     post:
       operationId: checkReport
@@ -719,6 +750,66 @@ components:
       required:
         - buckets
         - totalReports
+
+    ReportComparison:
+      type: object
+      properties:
+        sourceReport:
+          type: object
+          properties:
+            id:
+              type: integer
+            reportCode:
+              type: string
+            snippet:
+              type: ["string", "null"]
+              description: First 2000 chars of redacted text (null if similarity_only mode)
+            slopScore:
+              type: integer
+            slopTier:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+          required:
+            - id
+            - reportCode
+            - slopScore
+            - slopTier
+            - createdAt
+        matchedReport:
+          type: object
+          properties:
+            id:
+              type: integer
+            reportCode:
+              type: string
+            snippet:
+              type: ["string", "null"]
+              description: First 2000 chars of redacted text (null if similarity_only mode)
+            slopScore:
+              type: integer
+            slopTier:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+          required:
+            - id
+            - reportCode
+            - slopScore
+            - slopTier
+            - createdAt
+        similarity:
+          type: integer
+          description: Similarity percentage between the two reports
+        matchType:
+          type: string
+      required:
+        - sourceReport
+        - matchedReport
+        - similarity
+        - matchType
 
     SubmitFeedbackBody:
       type: object

@@ -27,35 +27,42 @@ export function isLLMAvailable(): boolean {
   );
 }
 
-const SYSTEM_PROMPT = `You are a vulnerability report quality analyst. Your job is to evaluate whether a given vulnerability report appears to be AI-generated "slop" or a genuine human-written research finding.
+const SYSTEM_PROMPT = `You are a PSIRT (Product Security Incident Response Team) triage analyst evaluating incoming vulnerability reports. Your job is to score how likely a report is AI-generated "slop" vs. genuine human security research — helping triage teams decide where to invest limited review time.
 
 Score the report from 0 to 100, where:
-- 0–14: Probably Legit — reads like genuine human research
-- 15–29: Mildly Suspicious — mostly human but has some AI-like patterns
-- 30–49: Questionable — noticeable AI-generation signals
-- 50–69: Highly Suspicious — multiple strong AI-generation indicators
-- 70–100: Pure Slop — overwhelmingly AI-generated markers
+- 0–14: Probably Legit — reads like genuine human research with verifiable details
+- 15–29: Mildly Suspicious — mostly credible but has minor AI-like patterns
+- 30–49: Questionable — noticeable AI-generation signals; needs closer triage review
+- 50–69: Highly Suspicious — multiple strong AI-generation indicators; likely wastes triage time
+- 70–100: Pure Slop — overwhelmingly AI-generated; safe to deprioritize
 
-Focus on SEMANTIC signals that regex cannot catch:
-1. Technical specificity — Are version numbers, endpoints, payloads, and system details real and consistent, or vague and generic?
-2. Internal coherence — Does the PoC actually demonstrate the claimed vulnerability? Do the reproduction steps logically follow from the described issue?
-3. Genericity — Could this report describe ANY application, or is it clearly tied to a specific target with concrete observations?
-4. Narrative credibility — Does it read like someone who actually found and verified this issue, or like an AI hallucinating a plausible-sounding report structure?
+Evaluate these PSIRT-specific dimensions (semantic signals that regex cannot catch):
+
+1. **Technical specificity** — Are version numbers, endpoints, payloads, and system details concrete and internally consistent? Or are they vague placeholders (e.g., "the API endpoint", "a recent version")? Real researchers cite exact versions, paths, and parameters.
+
+2. **PoC validity** — Does the proof-of-concept actually demonstrate the claimed vulnerability class? A report claiming SQLi but showing only an XSS payload, or describing a generic attack without a working exploit, is a red flag. Check if reproduction steps would actually trigger the described behavior.
+
+3. **Target specificity** — Could this report be copy-pasted against ANY application with minimal edits? Mass-submission slop uses templated language with slot-filled product names. Genuine reports contain observations specific to the target's actual behavior, error messages, or architecture.
+
+4. **Narrative credibility** — Does the report read like someone who actually tested this? Look for signs of real interaction: specific error messages encountered, unexpected behaviors observed, iterative discovery. AI slop tends to describe idealized attack flows without the messy reality of actual testing.
+
+5. **Template & mass-submission signals** — Does the report follow a rigid template structure identical to known AI-generated vulnerability reports? Look for: identical section ordering across all vuln types, placeholder-like descriptions, claims of "critical" severity without supporting evidence, and boilerplate remediation advice copied verbatim from OWASP/CWE descriptions.
 
 Respond ONLY with a valid JSON object — no preamble, no markdown, no explanation outside the JSON:
 {
   "score": <integer 0-100>,
   "observations": [
-    "<specific observation 1>",
-    "<specific observation 2>",
-    "<specific observation 3>"
+    "<specific observation about THIS report>",
+    "<specific observation about THIS report>",
+    "<specific observation about THIS report>"
   ]
 }
 
 Rules:
 - observations array must have exactly 2–4 items
-- Each observation must be a concrete, actionable sentence about THIS specific report
-- Do not use generic statements. Reference actual content from the report.
+- Each observation must be a concrete, actionable sentence referencing actual content from this report
+- Frame observations from a PSIRT triage perspective: "A triage analyst would notice..." or "This report [does/lacks]..."
+- Do not use generic statements. Reference actual phrases, sections, or details (or their absence) from the report.
 - Do not mention that you are an AI or that you are analyzing the report`;
 
 export async function analyzeSlopWithLLM(
@@ -65,7 +72,7 @@ export async function analyzeSlopWithLLM(
   if (!client) return null;
 
   const truncatedText =
-    text.length > 6000 ? text.slice(0, 6000) + "\n\n[truncated for analysis]" : text;
+    text.length > 8000 ? text.slice(0, 8000) + "\n\n[truncated for analysis]" : text;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
@@ -79,7 +86,7 @@ export async function analyzeSlopWithLLM(
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: `Analyze this vulnerability report:\n\n---\n${truncatedText}\n---`,
+            content: `You are triaging this incoming vulnerability report. Score it for AI-generated slop:\n\n---\n${truncatedText}\n---`,
           },
         ],
       },

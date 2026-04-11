@@ -29,6 +29,7 @@ import type {
   PlatformStats,
   RecentActivity,
   ReportAnalysis,
+  ReportComparison,
   ReportFeed,
   SlopDistribution,
   SubmitFeedbackBody,
@@ -476,6 +477,98 @@ export function useGetVerification<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetVerificationQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns redacted text snippets of both reports for side-by-side similarity comparison
+ * @summary Compare two reports side by side
+ */
+export const getCompareReportsUrl = (id: number, matchId: number) => {
+  return `/api/reports/${id}/compare/${matchId}`;
+};
+
+export const compareReports = async (
+  id: number,
+  matchId: number,
+  options?: RequestInit,
+): Promise<ReportComparison> => {
+  return customFetch<ReportComparison>(getCompareReportsUrl(id, matchId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getCompareReportsQueryKey = (id: number, matchId: number) => {
+  return [`/api/reports/${id}/compare/${matchId}`] as const;
+};
+
+export const getCompareReportsQueryOptions = <
+  TData = Awaited<ReturnType<typeof compareReports>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  matchId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareReports>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getCompareReportsQueryKey(id, matchId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof compareReports>>> = ({
+    signal,
+  }) => compareReports(id, matchId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(id && matchId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof compareReports>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type CompareReportsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof compareReports>>
+>;
+export type CompareReportsQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Compare two reports side by side
+ */
+
+export function useCompareReports<
+  TData = Awaited<ReturnType<typeof compareReports>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  matchId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareReports>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getCompareReportsQueryOptions(id, matchId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useGetReport, getGetReportQueryKey, useGetVerification, getGetVerificationQueryKey, useDeleteReport } from "@workspace/api-client-react";
+import { useGetReport, getGetReportQueryKey, useGetVerification, getGetVerificationQueryKey, useDeleteReport, useCompareReports, getCompareReportsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -83,6 +83,71 @@ function removeDeleteToken(reportId: number) {
   } catch {}
 }
 
+function ComparePanel({ reportId, matchId, matchSimilarity, matchType }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string }) {
+  const { data: comparison, isLoading, isError } = useCompareReports(reportId, matchId, {
+    query: { enabled: true, queryKey: getCompareReportsQueryKey(reportId, matchId) },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 space-y-2">
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  if (isError || !comparison) {
+    return (
+      <div className="mt-3 text-xs text-muted-foreground italic">
+        Could not load comparison data.
+      </div>
+    );
+  }
+
+  const src = comparison.sourceReport;
+  const mtch = comparison.matchedReport;
+
+  return (
+    <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Your Report ({src.reportCode})</span>
+            <Badge variant="outline" className="text-[10px]">
+              Score: <span className={getSlopColor(src.slopScore)}>{src.slopScore}</span>
+            </Badge>
+          </div>
+          <div className="glass-card rounded-lg p-3 max-h-64 overflow-y-auto">
+            {src.snippet ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-foreground/80">{src.snippet}{src.snippet.length >= 2000 ? "\n\n[truncated...]" : ""}</pre>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Content not available (similarity-only mode)</p>
+            )}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Matched Report ({mtch.reportCode})</span>
+            <Badge variant="outline" className="text-[10px]">
+              Score: <span className={getSlopColor(mtch.slopScore)}>{mtch.slopScore}</span>
+            </Badge>
+          </div>
+          <div className="glass-card rounded-lg p-3 max-h-64 overflow-y-auto">
+            {mtch.snippet ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap leading-relaxed text-foreground/80">{mtch.snippet}{mtch.snippet.length >= 2000 ? "\n\n[truncated...]" : ""}</pre>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Content not available (similarity-only mode)</p>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <span>Submitted: {new Date(src.createdAt).toLocaleDateString()} vs {new Date(mtch.createdAt).toLocaleDateString()}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Results() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id || "0", 10);
@@ -90,6 +155,7 @@ export default function Results() {
   const navigate = useNavigate();
   const [showFullReport, setShowFullReport] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedCompare, setExpandedCompare] = useState<number | null>(null);
   const deleteToken = getDeleteToken(id);
 
   const deleteMutation = useDeleteReport({
@@ -428,25 +494,48 @@ export default function Results() {
         <CardContent>
           {report.similarityMatches && report.similarityMatches.length > 0 ? (
             <div className="space-y-6">
-              {report.similarityMatches.map((match, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-mono text-sm">
-                      Match <span className="text-primary glow-text-sm">{anonymizeId(match.reportId)}</span>
-                    </span>
-                    <Badge variant={match.similarity > 80 ? "destructive" : "secondary"}>
-                      {match.matchType}
-                    </Badge>
+              {report.similarityMatches.map((match, i) => {
+                const isExpanded = expandedCompare === match.reportId;
+                return (
+                  <div key={i} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-sm">
+                        Match <span className="text-primary glow-text-sm">{anonymizeId(match.reportId)}</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={match.similarity > 80 ? "destructive" : "secondary"}>
+                          {match.matchType}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Progress value={match.similarity} className="flex-1 h-2" indicatorClassName={match.similarity > 80 ? "bg-destructive" : "bg-primary"} />
+                      <span className="font-mono text-sm w-12 text-right">{Math.round(match.similarity)}%</span>
+                    </div>
+                    {match.similarity > 80 && (
+                      <p className="text-xs text-destructive/80 italic pl-1">High similarity -- this may be a duplicate of a previously reported vulnerability.</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 glass-card hover:border-primary/30 text-xs mt-1"
+                      onClick={() => setExpandedCompare(isExpanded ? null : match.reportId)}
+                    >
+                      <GitCompare className="w-3.5 h-3.5" />
+                      {isExpanded ? "Hide" : "Compare"} Side by Side
+                      {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </Button>
+                    {isExpanded && (
+                      <ComparePanel
+                        reportId={id}
+                        matchId={match.reportId}
+                        matchSimilarity={match.similarity}
+                        matchType={match.matchType}
+                      />
+                    )}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Progress value={match.similarity} className="flex-1 h-2" indicatorClassName={match.similarity > 80 ? "bg-destructive" : "bg-primary"} />
-                    <span className="font-mono text-sm w-12 text-right">{Math.round(match.similarity)}%</span>
-                  </div>
-                  {match.similarity > 80 && (
-                    <p className="text-xs text-destructive/80 italic pl-1">High similarity -- this may be a duplicate of a previously reported vulnerability.</p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
@@ -575,9 +664,9 @@ export default function Results() {
                 <Brain className="w-2.5 h-2.5" />
                 LLM Enhanced
               </Badge>
-              <Hint text="Semantic observations from the LLM analyzer (gpt-5-nano). This layer evaluates technical specificity, internal coherence, genericity, and narrative credibility — signals that regex cannot detect. Score weighted at 60% in the final blend." />
+              <Hint text="Semantic observations from the LLM analyzer, evaluating reports from a PSIRT triage perspective. Covers technical specificity, PoC validity, target specificity, narrative credibility, and template/mass-submission signals. Score weighted at 60% in the final blend." />
             </CardTitle>
-            <CardDescription>Semantic observations across four credibility dimensions</CardDescription>
+            <CardDescription>PSIRT triage observations across five credibility dimensions</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">

@@ -4,7 +4,7 @@
 
 VulnRap.com — a vulnerability report validation platform (like VirusTotal for bug reports). Allows anonymous users to upload vulnerability reports to check for similarity with other reports and score them for potential AI-generated sloppiness using a two-layer scoring engine (deterministic heuristics + LLM semantic analysis via gpt-5-nano). Reports are auto-redacted before storage to remove PII, secrets, and identifying information.
 
-**Current version: 1.1.0** — LLM-enhanced slop detection, security fixes, API + docs improvements.
+**Current version: 1.2.0** — PSIRT-focused LLM prompt, side-by-side similarity comparison, input hardening.
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
@@ -76,6 +76,21 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - Tiers: Probably Legit (0-14), Mildly Suspicious (15-29), Questionable (30-49), Highly Suspicious (50-69), Pure Slop (70-100)
 - Returns actionable feedback strings
 
+### LLM Semantic Analysis (`artifacts/api-server/src/lib/llm-slop.ts`)
+- PSIRT-focused LLM prompt evaluating 5 dimensions: technical specificity, PoC validity, target specificity, narrative credibility, template/mass-submission signals
+- Uses gpt-5-nano via Replit AI integrations proxy
+- 8000 char truncation limit for analysis context
+- Blended scoring: finalScore = heuristic * 0.4 + LLM * 0.6, clamped 0-100
+- Graceful fallback to heuristic-only when LLM unavailable/timeout (20s)
+
+### Input Sanitization (`artifacts/api-server/src/lib/sanitize.ts`)
+- HTML tag stripping (script, style, all tags)
+- Control character removal
+- Excessive whitespace/newline collapsing
+- Max input length guard (20MB)
+- Safe JSON parsing with prototype pollution protection
+- Filename sanitization (path traversal prevention)
+
 ### Upload Pipeline
 1. User uploads .txt/.md file OR pastes text directly (plain text only, sanitized server-side)
 2. Auto-redaction engine scrubs PII/secrets from raw text
@@ -107,6 +122,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `POST /api/reports/check` — Check a report without storing (receiver flow, read-only analysis)
 - `GET /api/reports/:id` — Get report analysis results (includes redacted text, section hashes, redaction summary)
 - `GET /api/reports/:id/verify` — Lightweight verification badge data (slop score, match counts, verify URL)
+- `GET /api/reports/:id/compare/:matchId` — Side-by-side comparison of two reports (redacted text snippets, scores, metadata)
 - `GET /api/reports/lookup/:hash` — Look up by SHA-256 hash
 - `GET /api/stats` — Platform-wide statistics
 - `GET /api/stats/recent` — Recent submission activity

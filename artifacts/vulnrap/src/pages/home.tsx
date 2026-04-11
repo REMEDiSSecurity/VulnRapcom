@@ -358,23 +358,28 @@ const slopSignals = [
 const llmDimensions = [
   {
     label: "Technical Specificity",
-    description: "Are version numbers, endpoints, and payloads real and consistent, or vague and generic?",
+    description: "Are version numbers, endpoints, and payloads concrete and internally consistent, or vague placeholders?",
     example: "\"/api/v2/users/profile\" vs \"the API endpoint\"",
   },
   {
-    label: "Internal Coherence",
-    description: "Does the PoC actually demonstrate the claimed vulnerability? Do reproduction steps follow logically from the described issue?",
-    example: "SQLi PoC that doesn't include a SQL payload",
+    label: "PoC Validity",
+    description: "Does the proof-of-concept actually demonstrate the claimed vulnerability class? Do reproduction steps match the described issue?",
+    example: "SQLi claim with an XSS payload, or generic attack without a working exploit",
   },
   {
-    label: "Genericity",
-    description: "Could this report describe any application, or is it clearly tied to a specific target with concrete observations?",
+    label: "Target Specificity",
+    description: "Could this report be copy-pasted against any application with minimal edits, or does it contain target-specific observations?",
     example: "\"the login form\" vs \"/admin/login on myapp.example.com v3.1.2\"",
   },
   {
     label: "Narrative Credibility",
-    description: "Does it read like someone who actually found and verified this issue, or like an AI hallucinating a plausible-sounding structure?",
-    example: "Describing behavior seen in actual testing vs. invented outcomes",
+    description: "Does the report read like someone who actually tested this, with specific error messages and iterative discovery?",
+    example: "Describing actual error messages encountered vs. idealized attack flows",
+  },
+  {
+    label: "Template & Mass-Submission Signals",
+    description: "Does the report follow a rigid template identical to known AI-generated reports, with boilerplate remediation advice?",
+    example: "Identical section ordering across all vuln types, OWASP remediation copied verbatim",
   },
 ];
 
@@ -465,7 +470,7 @@ function SlopDetectionCard() {
               Layer 2 — LLM Semantic Analyzer (gpt-5-nano)
             </h4>
             <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
-              The LLM reads the report and scores four semantic dimensions that regex fundamentally cannot evaluate. It returns a 0–100 score and 2–4 concrete observations specific to the report content.
+              The LLM evaluates reports from a PSIRT triage perspective across five semantic dimensions that regex fundamentally cannot assess. It returns a 0–100 score and 2–4 concrete observations specific to the report content.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {llmDimensions.map((dim) => (

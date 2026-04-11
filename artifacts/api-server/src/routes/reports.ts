@@ -15,6 +15,8 @@ import {
   GetReportFeedResponse,
   DeleteReportBody,
   DeleteReportResponse,
+  CompareReportsParams,
+  CompareReportsResponse,
 } from "@workspace/api-zod";
 import { computeMinHash, computeSimhash, computeContentHash, computeLSHBuckets, findSimilarReports } from "../lib/similarity";
 import { analyzeSloppiness } from "../lib/sloppiness";
@@ -583,6 +585,77 @@ router.get("/reports/lookup/:hash", async (req, res): Promise<void> => {
     slopTier: report.slopTier,
     matchCount: matches.length,
     firstSeen: report.createdAt,
+  });
+
+  res.json(response);
+});
+
+router.get("/reports/:id/compare/:matchId", async (req, res): Promise<void> => {
+  const params = CompareReportsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [sourceReport, matchedReport] = await Promise.all([
+    db.select({
+      id: reportsTable.id,
+      redactedText: reportsTable.redactedText,
+      slopScore: reportsTable.slopScore,
+      slopTier: reportsTable.slopTier,
+      similarityMatches: reportsTable.similarityMatches,
+      createdAt: reportsTable.createdAt,
+    }).from(reportsTable).where(eq(reportsTable.id, params.data.id)),
+    db.select({
+      id: reportsTable.id,
+      redactedText: reportsTable.redactedText,
+      slopScore: reportsTable.slopScore,
+      slopTier: reportsTable.slopTier,
+      createdAt: reportsTable.createdAt,
+    }).from(reportsTable).where(eq(reportsTable.id, params.data.matchId)),
+  ]);
+
+  if (!sourceReport[0]) {
+    res.status(404).json({ error: "Source report not found." });
+    return;
+  }
+  if (!matchedReport[0]) {
+    res.status(404).json({ error: "Matched report not found." });
+    return;
+  }
+
+  const src = sourceReport[0];
+  const mtch = matchedReport[0];
+
+  const matches = (src.similarityMatches as Array<{ reportId: number; similarity: number; matchType: string }>) || [];
+  const matchInfo = matches.find(m => m.reportId === params.data.matchId);
+
+  if (!matchInfo) {
+    res.status(404).json({ error: "No similarity relationship found between these reports." });
+    return;
+  }
+
+  const snippetLength = 2000;
+
+  const response = CompareReportsResponse.parse({
+    sourceReport: {
+      id: src.id,
+      reportCode: anonymizeId(src.id),
+      snippet: src.redactedText ? src.redactedText.slice(0, snippetLength) : null,
+      slopScore: src.slopScore,
+      slopTier: src.slopTier,
+      createdAt: src.createdAt,
+    },
+    matchedReport: {
+      id: mtch.id,
+      reportCode: anonymizeId(mtch.id),
+      snippet: mtch.redactedText ? mtch.redactedText.slice(0, snippetLength) : null,
+      slopScore: mtch.slopScore,
+      slopTier: mtch.slopTier,
+      createdAt: mtch.createdAt,
+    },
+    similarity: matchInfo?.similarity ?? 0,
+    matchType: matchInfo?.matchType ?? "unknown",
   });
 
   res.json(response);

@@ -227,6 +227,40 @@ export interface SlopDistribution {
   totalReports: number;
 }
 
+export type ReportComparisonSourceReport = {
+  id: number;
+  reportCode: string;
+  /**
+   * First 2000 chars of redacted text (null if similarity_only mode)
+   * @nullable
+   */
+  snippet?: string | null;
+  slopScore: number;
+  slopTier: string;
+  createdAt: string;
+};
+
+export type ReportComparisonMatchedReport = {
+  id: number;
+  reportCode: string;
+  /**
+   * First 2000 chars of redacted text (null if similarity_only mode)
+   * @nullable
+   */
+  snippet?: string | null;
+  slopScore: number;
+  slopTier: string;
+  createdAt: string;
+};
+
+export interface ReportComparison {
+  sourceReport: ReportComparisonSourceReport;
+  matchedReport: ReportComparisonMatchedReport;
+  /** Similarity percentage between the two reports */
+  similarity: number;
+  matchType: string;
+}
+
 export interface SubmitFeedbackBody {
   /** The report ID this feedback is about (optional) */
   reportId?: number;

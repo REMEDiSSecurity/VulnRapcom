@@ -176,6 +176,48 @@ export const GetVerificationResponse = zod.object({
 });
 
 /**
+ * Returns redacted text snippets of both reports for side-by-side similarity comparison
+ * @summary Compare two reports side by side
+ */
+export const CompareReportsParams = zod.object({
+  id: zod.coerce.number(),
+  matchId: zod.coerce.number(),
+});
+
+export const CompareReportsResponse = zod.object({
+  sourceReport: zod.object({
+    id: zod.number(),
+    reportCode: zod.string(),
+    snippet: zod
+      .string()
+      .nullish()
+      .describe(
+        "First 2000 chars of redacted text (null if similarity_only mode)",
+      ),
+    slopScore: zod.number(),
+    slopTier: zod.string(),
+    createdAt: zod.coerce.date(),
+  }),
+  matchedReport: zod.object({
+    id: zod.number(),
+    reportCode: zod.string(),
+    snippet: zod
+      .string()
+      .nullish()
+      .describe(
+        "First 2000 chars of redacted text (null if similarity_only mode)",
+      ),
+    slopScore: zod.number(),
+    slopTier: zod.string(),
+    createdAt: zod.coerce.date(),
+  }),
+  similarity: zod
+    .number()
+    .describe("Similarity percentage between the two reports"),
+  matchType: zod.string(),
+});
+
+/**
  * For report receivers -- analyze a report for similarity and sloppiness without adding it to the database
  * @summary Check a report against the database without storing it
  */
