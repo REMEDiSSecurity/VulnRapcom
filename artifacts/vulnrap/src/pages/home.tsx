@@ -144,7 +144,7 @@ function AutoRedactionCard() {
             Auto-Redaction
             <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </h3>
-          <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, and company names are scrubbed before storage or comparison. Tap to see exactly what we catch.</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">PII, secrets, and company names are scrubbed from submitted reports before storage or comparison. Tap to see exactly what gets caught.</p>
         </div>
       </button>
 
@@ -153,7 +153,7 @@ function AutoRedactionCard() {
           <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/20 px-3 py-2 flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Redaction is regex-based, not AI-powered. It catches common patterns but <strong className="text-foreground">cannot guarantee</strong> every sensitive value is removed. Unusual formats, obfuscated data, or context-dependent secrets may slip through. Always pre-sanitize anything truly sensitive before uploading.
+              Redaction is regex-based, not AI-powered. It catches common patterns but <strong className="text-foreground">cannot guarantee</strong> every sensitive value is removed. Unusual formats, obfuscated data, or context-dependent secrets may slip through. If a report contains highly sensitive details, consider pre-sanitizing before uploading.
             </p>
           </div>
 
@@ -266,7 +266,7 @@ function SectionHashingCard() {
             Section Hashing
             <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </h3>
-          <p className="text-xs text-muted-foreground leading-relaxed">Each section is hashed independently, detecting partial matches across reports. Tap to see how.</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">Each section is hashed independently, detecting partial matches across reports your team has received. Tap to see how.</p>
         </div>
       </button>
 
@@ -404,7 +404,7 @@ function SlopDetectionCard() {
             Slop Detection
             <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
           </h3>
-          <p className="text-xs text-muted-foreground leading-relaxed">Linguistic analysis scores AI-generation likelihood with actionable feedback. Tap to see what we check.</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">Scores AI-generation likelihood so your team can prioritize real findings over generated noise. Tap to see what we check.</p>
         </div>
       </button>
 
@@ -735,7 +735,7 @@ export default function Home() {
         </div>
         <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight text-primary uppercase glow-text" data-testid="text-heading">Report Validation</h1>
         <p className="text-sm sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed px-2">
-          Validate your vulnerability reports before submission. We check for similarities against known reports and analyze your content for AI-generated "slop".
+          Analyze incoming vulnerability reports for AI-generated "slop" and cross-check against known submissions. Built for PSIRT teams, triage analysts, and anyone buried in an inbox full of bug bounty reports.
         </p>
       </div>
 
