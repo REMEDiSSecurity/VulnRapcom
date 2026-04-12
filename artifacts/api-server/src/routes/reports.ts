@@ -37,12 +37,17 @@ import {
   detectRevision,
   type TriageRecommendation,
 } from "../lib/triage-recommendation";
+import {
+  generateTriageAssistant,
+  type TriageAssistantResult,
+} from "../lib/triage-assistant";
 
 interface AnalysisResult extends FusionResult {
   feedback: string[];
   llmResult: Awaited<ReturnType<typeof analyzeSlopWithLLM>>;
   verification: VerificationResult | null;
   triageRecommendation: TriageRecommendation | null;
+  triageAssistant: TriageAssistantResult | null;
 }
 
 async function performAnalysis(originalText: string, redactedText: string): Promise<AnalysisResult> {
@@ -92,12 +97,27 @@ async function performAnalysis(originalText: string, redactedText: string): Prom
     logger.warn({ err }, "Triage recommendation generation failed");
   }
 
+  let triageAssistant: TriageAssistantResult | null = null;
+  try {
+    triageAssistant = generateTriageAssistant(
+      originalText,
+      fusion.slopScore,
+      fusion.confidence,
+      fusion.evidence,
+      verification,
+      llmResult?.llmTriageGuidance ?? null,
+    );
+  } catch (err) {
+    logger.warn({ err }, "Triage assistant generation failed");
+  }
+
   return {
     ...fusion,
     feedback: heuristic.feedback,
     llmResult,
     verification,
     triageRecommendation,
+    triageAssistant,
   };
 }
 
@@ -535,6 +555,7 @@ router.post("/reports", async (req, res): Promise<void> => {
     llmEnhanced: report.llmSlopScore != null,
     verification: analysisResult.verification ?? null,
     triageRecommendation: analysisResult.triageRecommendation ?? null,
+    triageAssistant: analysisResult.triageAssistant ?? null,
     fileName: report.fileName,
     fileSize: report.fileSize,
     createdAt: report.createdAt,
@@ -670,6 +691,7 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     llmEnhanced: checkLlmResult != null,
     verification: analysisResult.verification ?? null,
     triageRecommendation: analysisResult.triageRecommendation ?? null,
+    triageAssistant: analysisResult.triageAssistant ?? null,
     previouslySubmitted: !!existingReport,
     existingReportId: existingReport?.id ?? null,
   });
@@ -982,6 +1004,20 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     };
   } catch {}
 
+  let triageAssistant: TriageAssistantResult | null = null;
+  try {
+    if (report.redactedText) {
+      triageAssistant = generateTriageAssistant(
+        report.redactedText,
+        report.slopScore ?? 50,
+        (report.confidence as number) ?? 0.5,
+        (report.evidence as EvidenceItem[]) ?? [],
+        verification,
+        null,
+      );
+    }
+  } catch {}
+
   const response = GetReportResponse.parse({
     id: report.id,
     contentHash: report.contentHash,
@@ -1005,6 +1041,7 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     llmEnhanced: report.llmSlopScore != null,
     verification,
     triageRecommendation,
+    triageAssistant,
     fileName: report.fileName,
     fileSize: report.fileSize,
     createdAt: report.createdAt,
@@ -1087,6 +1124,20 @@ router.get("/reports/:id/triage-report", async (req, res): Promise<void> => {
     } catch {}
 
     triageRecommendation = { ...base, temporalSignals, templateMatch: mdTemplateMatch, revision: mdRevision };
+  } catch {}
+
+  let mdTriageAssistant: TriageAssistantResult | null = null;
+  try {
+    if (report.redactedText) {
+      mdTriageAssistant = generateTriageAssistant(
+        report.redactedText,
+        report.slopScore ?? 50,
+        (report.confidence as number) ?? 0.5,
+        (report.evidence as EvidenceItem[]) ?? [],
+        verification,
+        null,
+      );
+    }
   } catch {}
 
   const lines: string[] = [];
@@ -1181,6 +1232,88 @@ router.get("/reports/:id/triage-report", async (req, res): Promise<void> => {
       lines.push(`- **[${h.type}]** ${h.description} (weight: ${h.weight})`);
     }
     lines.push("");
+  }
+
+  if (mdTriageAssistant) {
+    if (mdTriageAssistant.reproGuidance) {
+      const rg = mdTriageAssistant.reproGuidance;
+      lines.push("## Reproduction Guidance");
+      lines.push("");
+      lines.push(`**Detected Vulnerability Class**: ${rg.vulnClass} (confidence: ${(rg.confidence * 100).toFixed(0)}%)`);
+      lines.push("");
+      lines.push("### Steps to Reproduce");
+      for (const step of rg.steps) {
+        lines.push(`${step.order}. ${step.instruction}${step.note ? ` *(${step.note})*` : ""}`);
+      }
+      lines.push("");
+      lines.push("### Environment Needed");
+      for (const env of rg.environment) {
+        lines.push(`- ${env}`);
+      }
+      lines.push("");
+      lines.push("### Recommended Tools");
+      for (const tool of rg.tools) {
+        lines.push(`- ${tool}`);
+      }
+      lines.push("");
+    }
+
+    if (mdTriageAssistant.gaps.length > 0) {
+      lines.push("## Gap Analysis");
+      lines.push("");
+      for (const gap of mdTriageAssistant.gaps) {
+        const icon = gap.severity === "critical" ? "🔴" : gap.severity === "important" ? "🟡" : "🔵";
+        lines.push(`- ${icon} **${gap.category.replace(/_/g, " ")}** (${gap.severity}): ${gap.description}`);
+        lines.push(`  - *Suggestion*: ${gap.suggestion}`);
+      }
+      lines.push("");
+    }
+
+    if (mdTriageAssistant.dontMiss.length > 0) {
+      lines.push("## Don't Miss");
+      lines.push("");
+      for (const item of mdTriageAssistant.dontMiss) {
+        lines.push(`### ${item.area}`);
+        lines.push(`⚠️ ${item.warning}`);
+        lines.push(`> ${item.reason}`);
+        lines.push("");
+      }
+    }
+
+    if (mdTriageAssistant.reporterFeedback.length > 0) {
+      lines.push("## Reporter Feedback");
+      lines.push("");
+      for (const fb of mdTriageAssistant.reporterFeedback) {
+        const icon = fb.tone === "positive" ? "✅" : fb.tone === "concern" ? "⚠️" : "ℹ️";
+        lines.push(`- ${icon} ${fb.message}`);
+      }
+      lines.push("");
+    }
+
+    if (mdTriageAssistant.llmTriageGuidance) {
+      const ltg = mdTriageAssistant.llmTriageGuidance;
+      lines.push("## AI-Assisted Triage Guidance");
+      lines.push("");
+      if (ltg.reproSteps.length > 0) {
+        lines.push("### Recommended Reproduction Steps");
+        ltg.reproSteps.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+        lines.push("");
+      }
+      if (ltg.missingInfo.length > 0) {
+        lines.push("### Missing Information");
+        ltg.missingInfo.forEach(s => lines.push(`- ${s}`));
+        lines.push("");
+      }
+      if (ltg.dontMiss.length > 0) {
+        lines.push("### Don't Overlook");
+        ltg.dontMiss.forEach(s => lines.push(`- ${s}`));
+        lines.push("");
+      }
+      if (ltg.reporterFeedback) {
+        lines.push(`**Reporter Assessment**: ${ltg.reporterFeedback}`);
+        lines.push("");
+      }
+    }
   }
 
   lines.push("---");

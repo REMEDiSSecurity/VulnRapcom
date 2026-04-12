@@ -574,6 +574,11 @@ components:
             - $ref: "#/components/schemas/TriageRecommendation"
             - type: "null"
           description: Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.
+        triageAssistant:
+          oneOf:
+            - $ref: "#/components/schemas/TriageAssistant"
+            - type: "null"
+          description: AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed.
         fileName:
           type: ["string", "null"]
         fileSize:
@@ -717,6 +722,11 @@ components:
             - $ref: "#/components/schemas/TriageRecommendation"
             - type: "null"
           description: Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.
+        triageAssistant:
+          oneOf:
+            - $ref: "#/components/schemas/TriageAssistant"
+            - type: "null"
+          description: AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed.
         previouslySubmitted:
           type: boolean
           description: Whether this exact report was found in the database
@@ -1232,6 +1242,140 @@ components:
         - similarity
         - scoreChange
         - direction
+
+    ReproStep:
+      type: object
+      properties:
+        order:
+          type: integer
+        instruction:
+          type: string
+        note:
+          type: ["string", "null"]
+      required:
+        - order
+        - instruction
+
+    ReproGuidance:
+      type: object
+      properties:
+        vulnClass:
+          type: string
+        confidence:
+          type: number
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReproStep"
+        environment:
+          type: array
+          items:
+            type: string
+        tools:
+          type: array
+          items:
+            type: string
+      required:
+        - vulnClass
+        - confidence
+        - steps
+        - environment
+        - tools
+
+    GapItem:
+      type: object
+      properties:
+        category:
+          type: string
+        severity:
+          type: string
+          enum: [critical, important, minor]
+        description:
+          type: string
+        suggestion:
+          type: string
+      required:
+        - category
+        - severity
+        - description
+        - suggestion
+
+    DontMissItem:
+      type: object
+      properties:
+        area:
+          type: string
+        warning:
+          type: string
+        reason:
+          type: string
+      required:
+        - area
+        - warning
+        - reason
+
+    ReporterFeedbackItem:
+      type: object
+      properties:
+        tone:
+          type: string
+          enum: [positive, neutral, concern]
+        message:
+          type: string
+      required:
+        - tone
+        - message
+
+    LLMTriageGuidance:
+      type: object
+      properties:
+        reproSteps:
+          type: array
+          items:
+            type: string
+        missingInfo:
+          type: array
+          items:
+            type: string
+        dontMiss:
+          type: array
+          items:
+            type: string
+        reporterFeedback:
+          type: string
+      required:
+        - reproSteps
+        - missingInfo
+        - dontMiss
+        - reporterFeedback
+
+    TriageAssistant:
+      type: object
+      properties:
+        reproGuidance:
+          oneOf:
+            - $ref: "#/components/schemas/ReproGuidance"
+            - type: "null"
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapItem"
+        dontMiss:
+          type: array
+          items:
+            $ref: "#/components/schemas/DontMissItem"
+        reporterFeedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReporterFeedbackItem"
+        llmTriageGuidance:
+          oneOf:
+            - $ref: "#/components/schemas/LLMTriageGuidance"
+            - type: "null"
+      required:
+        - gaps
+        - dontMiss
+        - reporterFeedback
 
     SubmitFeedbackBody:
       type: object

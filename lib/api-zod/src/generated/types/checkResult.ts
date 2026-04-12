@@ -14,6 +14,7 @@ import type { RedactionSummary } from "./redactionSummary";
 import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
+import type { TriageAssistant } from "./triageAssistant";
 import type { TriageRecommendation } from "./triageRecommendation";
 import type { Verification } from "./verification";
 
@@ -55,6 +56,8 @@ export interface CheckResult {
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
   triageRecommendation?: TriageRecommendation | null;
+  /** AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed. */
+  triageAssistant?: TriageAssistant | null;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;
   /**

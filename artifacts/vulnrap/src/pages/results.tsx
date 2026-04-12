@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useGetReport, getGetReportQueryKey, useGetVerification, getGetVerificationQueryKey, useDeleteReport, useCompareReports, getCompareReportsQueryKey, type Verification, type VerificationCheck, type VerificationSummary, type TriageRecommendation, type ChallengeQuestion, type TemporalSignal, type TemplateMatch, type RevisionResult } from "@workspace/api-client-react";
+import { useGetReport, getGetReportQueryKey, useGetVerification, getGetVerificationQueryKey, useDeleteReport, useCompareReports, getCompareReportsQueryKey, type Verification, type VerificationCheck, type VerificationSummary, type TriageRecommendation, type ChallengeQuestion, type TemporalSignal, type TemplateMatch, type RevisionResult, type TriageAssistant, type ReproGuidance, type GapItem, type DontMissItem, type ReporterFeedbackItem, type LLMTriageGuidance } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge, Leaf, Shield, MessageSquareWarning, RefreshCw, Fingerprint, Timer } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge, Leaf, Shield, MessageSquareWarning, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -354,6 +354,266 @@ function TriageCard({ triage, challengeQuestions, temporalSignals, templateMatch
   );
 }
 
+type AssistantTab = "reproduce" | "gaps" | "dontmiss" | "feedback";
+
+function TriageAssistantPanel({ assistant, toast }: { assistant: TriageAssistant; toast: ReturnType<typeof useToast>["toast"] }) {
+  const [expanded, setExpanded] = useState(true);
+  const [activeTab, setActiveTab] = useState<AssistantTab>("reproduce");
+
+  const hasRepro = !!assistant.reproGuidance || (assistant.llmTriageGuidance?.reproSteps?.length ?? 0) > 0;
+  const hasGaps = assistant.gaps.length > 0 || (assistant.llmTriageGuidance?.missingInfo?.length ?? 0) > 0;
+  const hasDontMiss = assistant.dontMiss.length > 0 || (assistant.llmTriageGuidance?.dontMiss?.length ?? 0) > 0;
+  const hasFeedback = assistant.reporterFeedback.length > 0 || !!assistant.llmTriageGuidance?.reporterFeedback;
+
+  const tabs: { id: AssistantTab; label: string; icon: React.ReactNode; active: boolean; count?: number }[] = [
+    { id: "reproduce", label: "Reproduce", icon: <Crosshair className="w-3.5 h-3.5" />, active: hasRepro },
+    { id: "gaps", label: "Gaps", icon: <ListChecks className="w-3.5 h-3.5" />, active: hasGaps, count: assistant.gaps.length + (assistant.llmTriageGuidance?.missingInfo?.length ?? 0) },
+    { id: "dontmiss", label: "Don't Miss", icon: <Microscope className="w-3.5 h-3.5" />, active: hasDontMiss, count: assistant.dontMiss.length + (assistant.llmTriageGuidance?.dontMiss?.length ?? 0) },
+    { id: "feedback", label: "Reporter", icon: <UserCheck className="w-3.5 h-3.5" />, active: hasFeedback },
+  ];
+
+  const copyAssistantMarkdown = () => {
+    const lines: string[] = ["# Triage Assistant Summary", ""];
+    if (assistant.reproGuidance) {
+      const rg = assistant.reproGuidance;
+      lines.push(`## Reproduction (${rg.vulnClass})`, "");
+      rg.steps.forEach(s => lines.push(`${s.order}. ${s.instruction}${s.note ? ` (${s.note})` : ""}`));
+      lines.push("", "Environment: " + rg.environment.join(", "), "Tools: " + rg.tools.join(", "), "");
+    }
+    if (assistant.gaps.length > 0) {
+      lines.push("## Gaps", "");
+      assistant.gaps.forEach(g => lines.push(`- [${g.severity}] ${g.description} — ${g.suggestion}`));
+      lines.push("");
+    }
+    if (assistant.dontMiss.length > 0) {
+      lines.push("## Don't Miss", "");
+      assistant.dontMiss.forEach(d => lines.push(`- ${d.area}: ${d.warning}`));
+      lines.push("");
+    }
+    if (assistant.reporterFeedback.length > 0) {
+      lines.push("## Reporter Feedback", "");
+      assistant.reporterFeedback.forEach(f => lines.push(`- ${f.message}`));
+      lines.push("");
+    }
+    if (assistant.llmTriageGuidance) {
+      const ltg = assistant.llmTriageGuidance;
+      lines.push("## AI-Assisted Guidance", "");
+      if (ltg.reproSteps.length > 0) { lines.push("Steps:"); ltg.reproSteps.forEach((s, i) => lines.push(`${i + 1}. ${s}`)); lines.push(""); }
+      if (ltg.missingInfo.length > 0) { lines.push("Missing:"); ltg.missingInfo.forEach(s => lines.push(`- ${s}`)); lines.push(""); }
+      if (ltg.dontMiss.length > 0) { lines.push("Don't overlook:"); ltg.dontMiss.forEach(s => lines.push(`- ${s}`)); lines.push(""); }
+      if (ltg.reporterFeedback) lines.push(`Reporter: ${ltg.reporterFeedback}`, "");
+    }
+    navigator.clipboard.writeText(lines.join("\n"));
+    toast({ title: "Copied", description: "Triage assistant summary copied to clipboard." });
+  };
+
+  const severityColor = (s: string) => s === "critical" ? "text-destructive" : s === "important" ? "text-yellow-500" : "text-blue-400";
+  const severityBg = (s: string) => s === "critical" ? "bg-destructive/5 border-destructive/15" : s === "important" ? "bg-yellow-500/5 border-yellow-500/15" : "bg-blue-500/5 border-blue-500/15";
+  const toneIcon = (t: string) => t === "positive" ? <CheckCircle className="w-4 h-4 text-green-400" /> : t === "concern" ? <AlertTriangle className="w-4 h-4 text-yellow-500" /> : <HelpCircle className="w-4 h-4 text-blue-400" />;
+
+  return (
+    <Card className="glass-card rounded-xl border-indigo-500/20">
+      <CardHeader className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <CardTitle className="flex items-center gap-2">
+          <Crosshair className="w-5 h-5 text-indigo-400" />
+          Triage Assistant
+          {assistant.llmTriageGuidance && (
+            <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px] px-1.5 py-0 h-4 flex items-center gap-1 normal-case">
+              <Brain className="w-2.5 h-2.5" />
+              AI Enhanced
+            </Badge>
+          )}
+          <Hint text="Automated triage assistance: reproduction guidance tailored to the detected vulnerability class, gap analysis showing what's missing from the report, don't-miss warnings for common triage pitfalls, and reporter behavior assessment." />
+          <span className="ml-auto flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); copyAssistantMarkdown(); }}>
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+            {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </span>
+        </CardTitle>
+        <CardDescription>Reproduction guidance, gap analysis, and reporter assessment</CardDescription>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="space-y-4">
+          <div className="flex rounded-xl overflow-hidden glass-card">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "bg-primary text-primary-foreground"
+                    : tab.active ? "hover:bg-muted/30 text-muted-foreground" : "text-muted-foreground/40 cursor-not-allowed"
+                }`}
+                disabled={!tab.active}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.count != null && tab.count > 0 && (
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 ml-0.5">{tab.count}</Badge>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "reproduce" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {assistant.reproGuidance && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge variant="outline" className="border-indigo-500/40 text-indigo-400 text-[10px]">
+                      {assistant.reproGuidance.vulnClass}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {(assistant.reproGuidance.confidence * 100).toFixed(0)}% confidence
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {assistant.reproGuidance.steps.map((step) => (
+                      <div key={step.order} className="flex items-start gap-3 glass-card rounded-lg p-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-400">
+                          {step.order}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm leading-relaxed">{step.instruction}</p>
+                          {step.note && <p className="text-[10px] text-muted-foreground mt-1 italic">{step.note}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="glass-card rounded-lg p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Environment</div>
+                      <ul className="space-y-1">
+                        {assistant.reproGuidance.environment.map((env, i) => (
+                          <li key={i} className="text-xs flex items-start gap-1.5"><span className="w-1 h-1 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />{env}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="glass-card rounded-lg p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Tools</div>
+                      <ul className="space-y-1">
+                        {assistant.reproGuidance.tools.map((tool, i) => (
+                          <li key={i} className="text-xs flex items-start gap-1.5"><span className="w-1 h-1 rounded-full bg-indigo-400 mt-1.5 flex-shrink-0" />{tool}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {assistant.llmTriageGuidance && assistant.llmTriageGuidance.reproSteps.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-cyan-400">AI-Suggested Steps</span>
+                  </div>
+                  {assistant.llmTriageGuidance.reproSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-400">
+                        {i + 1}
+                      </div>
+                      <p className="text-sm leading-relaxed">{step}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!assistant.reproGuidance && !(assistant.llmTriageGuidance?.reproSteps?.length) && (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  Could not detect a specific vulnerability class for reproduction guidance.
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "gaps" && (
+            <div className="space-y-3 animate-in fade-in duration-200">
+              {assistant.gaps.map((gap, i) => (
+                <div key={i} className={`rounded-lg border p-3 ${severityBg(gap.severity)}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 uppercase ${severityColor(gap.severity)}`}>{gap.severity}</Badge>
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{gap.category.replace(/_/g, " ")}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed">{gap.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 italic">{gap.suggestion}</p>
+                </div>
+              ))}
+              {assistant.llmTriageGuidance && assistant.llmTriageGuidance.missingInfo.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-cyan-400">AI-Detected Missing Information</span>
+                  </div>
+                  {assistant.llmTriageGuidance.missingInfo.map((info, i) => (
+                    <div key={i} className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3 text-sm leading-relaxed">{info}</div>
+                  ))}
+                </div>
+              )}
+              {assistant.gaps.length === 0 && !(assistant.llmTriageGuidance?.missingInfo?.length) && (
+                <div className="flex flex-col items-center py-6 text-center">
+                  <CheckCircle className="w-8 h-8 text-green-400 mb-2" />
+                  <span className="text-sm font-medium">No significant gaps detected</span>
+                  <span className="text-xs text-muted-foreground">The report appears to contain the essential elements</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "dontmiss" && (
+            <div className="space-y-3 animate-in fade-in duration-200">
+              {assistant.dontMiss.map((item, i) => (
+                <div key={i} className="rounded-lg border border-orange-500/15 bg-orange-500/5 p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                    <span className="text-sm font-medium">{item.area}</span>
+                  </div>
+                  <p className="text-sm leading-relaxed">{item.warning}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">{item.reason}</p>
+                </div>
+              ))}
+              {assistant.llmTriageGuidance && assistant.llmTriageGuidance.dontMiss.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-cyan-400">AI Warnings</span>
+                  </div>
+                  {assistant.llmTriageGuidance.dontMiss.map((warning, i) => (
+                    <div key={i} className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3 text-sm leading-relaxed">{warning}</div>
+                  ))}
+                </div>
+              )}
+              {assistant.dontMiss.length === 0 && !(assistant.llmTriageGuidance?.dontMiss?.length) && (
+                <div className="text-center py-6 text-muted-foreground text-sm">No specific warnings for this report.</div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "feedback" && (
+            <div className="space-y-3 animate-in fade-in duration-200">
+              {assistant.reporterFeedback.map((fb, i) => (
+                <div key={i} className={`rounded-lg border p-3 flex items-start gap-3 ${
+                  fb.tone === "positive" ? "bg-green-500/5 border-green-500/15" :
+                  fb.tone === "concern" ? "bg-yellow-500/5 border-yellow-500/15" :
+                  "bg-blue-500/5 border-blue-500/15"
+                }`}>
+                  {toneIcon(fb.tone)}
+                  <p className="text-sm leading-relaxed">{fb.message}</p>
+                </div>
+              ))}
+              {assistant.llmTriageGuidance?.reporterFeedback && (
+                <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3 flex items-start gap-3">
+                  <Brain className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm leading-relaxed">{assistant.llmTriageGuidance.reporterFeedback}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 function ComparePanel({ reportId, matchId, matchSimilarity, matchType, settings }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string; settings: VulnRapSettings }) {
   const { data: comparison, isLoading, isError } = useCompareReports(reportId, matchId, {
     query: { enabled: true, queryKey: getCompareReportsQueryKey(reportId, matchId) },
@@ -663,6 +923,7 @@ export default function Results() {
   const evidence = report.evidence as Array<{ type: string; description: string; weight: number; matched?: string | null }> | undefined;
   const activeVerification = report.verification as Verification | null | undefined;
   const triage = report.triageRecommendation as TriageRecommendation | null | undefined;
+  const triageAssistant = report.triageAssistant as TriageAssistant | null | undefined;
   const triageChecks = activeVerification?.checks ?? [];
   const triageSummary = activeVerification?.summary;
   const challengeQuestions = triage?.challengeQuestions ?? [];
@@ -1095,6 +1356,10 @@ export default function Results() {
           revision={revisionInfo}
           toast={toast}
         />
+      )}
+
+      {triageAssistant && (
+        <TriageAssistantPanel assistant={triageAssistant} toast={toast} />
       )}
 
       {verification && (

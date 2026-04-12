@@ -2,11 +2,19 @@ import OpenAI from "openai";
 import { createHash } from "crypto";
 import { logger } from "./logger";
 
+export interface LLMTriageGuidance {
+  reproSteps: string[];
+  missingInfo: string[];
+  dontMiss: string[];
+  reporterFeedback: string;
+}
+
 export interface LLMSlopResult {
   llmSlopScore: number;
   llmFeedback: string[];
   llmBreakdown: LLMBreakdown | null;
   llmRedFlags: string[];
+  llmTriageGuidance: LLMTriageGuidance | null;
 }
 
 export interface LLMBreakdown {
@@ -84,7 +92,7 @@ function setCachedResult(text: string, result: LLMSlopResult): void {
   resultCache.set(getCacheKey(text), { result, ts: Date.now() });
 }
 
-const SYSTEM_PROMPT = `You are a PSIRT triage analyst scoring vulnerability reports for AI-generated "slop." Evaluate five dimensions and return structured JSON.
+const SYSTEM_PROMPT = `You are a PSIRT triage analyst scoring vulnerability reports for AI-generated "slop" AND providing triage guidance. Evaluate five dimensions and produce triage assistance in a single JSON response.
 
 ## Scoring Dimensions (each 0-100, where 100 = most suspicious/AI-like)
 
@@ -98,6 +106,13 @@ const SYSTEM_PROMPT = `You are a PSIRT triage analyst scoring vulnerability repo
 
 5. **hallucination** (weight 0.25): Are there signs of fabricated technical details? Score HIGH if function names seem invented, CVE IDs look wrong, severity claims lack evidence, generic code snippets that wouldn't actually work. Score LOW if technical details appear real and verifiable.
 
+## Triage Guidance
+Also produce actionable triage guidance for the PSIRT team receiving this report:
+- **repro_steps**: 2-5 concrete steps a triager should follow to reproduce this specific vulnerability (not generic steps — reference details from the report)
+- **missing_info**: 1-4 specific pieces of information missing from the report that would be needed for reproduction
+- **dont_miss**: 1-3 warnings about things a triager might overlook when evaluating this report
+- **reporter_feedback**: One sentence assessment of the reporter's likely expertise/intent based on the report quality
+
 ## Response Format
 Respond ONLY with valid JSON:
 {
@@ -107,12 +122,19 @@ Respond ONLY with valid JSON:
   "coherence": <0-100>,
   "hallucination": <0-100>,
   "red_flags": ["<specific red flag from THIS report>", ...],
-  "reasoning": "<2-3 sentence summary of your assessment>"
+  "reasoning": "<2-3 sentence summary of your assessment>",
+  "triage_guidance": {
+    "repro_steps": ["<step 1>", "<step 2>", ...],
+    "missing_info": ["<missing item 1>", ...],
+    "dont_miss": ["<warning 1>", ...],
+    "reporter_feedback": "<one sentence>"
+  }
 }
 
 Rules:
 - red_flags: 0-4 items, each a concrete observation referencing actual content
 - reasoning: concise, references specific parts of the report
+- triage_guidance: always present, reference specifics from the report, not generic advice
 - Do not mention that you are an AI`;
 
 export async function analyzeSlopWithLLM(
@@ -125,7 +147,7 @@ export async function analyzeSlopWithLLM(
   }
 
   const truncatedText =
-    text.length > 4000 ? text.slice(0, 4000) + "\n\n[truncated for analysis]" : text;
+    text.length > 6000 ? text.slice(0, 6000) + "\n\n[truncated for analysis]" : text;
 
   const cached = getCachedResult(truncatedText);
   if (cached) {
@@ -145,7 +167,7 @@ export async function analyzeSlopWithLLM(
       {
         model,
         temperature: 0.1,
-        max_completion_tokens: 600,
+        max_completion_tokens: 1500,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
@@ -177,6 +199,12 @@ export async function analyzeSlopWithLLM(
       reasoning?: string;
       score?: number;
       observations?: string[];
+      triage_guidance?: {
+        repro_steps?: string[];
+        missing_info?: string[];
+        dont_miss?: string[];
+        reporter_feedback?: string;
+      };
     };
 
     const hasNewFormat = parsed.specificity !== undefined ||
@@ -241,13 +269,33 @@ export async function analyzeSlopWithLLM(
       feedback.push(`LLM analysis complete: weighted score ${weightedScore}/100`);
     }
 
-    logger.info({ weightedScore, breakdown, elapsedMs }, "LLM slop: analysis complete");
+    let llmTriageGuidance: LLMTriageGuidance | null = null;
+    if (parsed.triage_guidance) {
+      const tg = parsed.triage_guidance;
+      const reproSteps = Array.isArray(tg.repro_steps)
+        ? tg.repro_steps.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 5)
+        : [];
+      const missingInfo = Array.isArray(tg.missing_info)
+        ? tg.missing_info.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 4)
+        : [];
+      const dontMiss = Array.isArray(tg.dont_miss)
+        ? tg.dont_miss.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 3)
+        : [];
+      const reporterFeedback = typeof tg.reporter_feedback === "string" ? tg.reporter_feedback.trim() : "";
+
+      if (reproSteps.length > 0 || missingInfo.length > 0 || dontMiss.length > 0 || reporterFeedback.length > 0) {
+        llmTriageGuidance = { reproSteps, missingInfo, dontMiss, reporterFeedback };
+      }
+    }
+
+    logger.info({ weightedScore, breakdown, hasTriageGuidance: !!llmTriageGuidance, elapsedMs }, "LLM slop: analysis complete");
 
     const result: LLMSlopResult = {
       llmSlopScore: clamp(weightedScore),
       llmFeedback: feedback,
       llmBreakdown: breakdown,
       llmRedFlags: redFlags,
+      llmTriageGuidance,
     };
 
     setCachedResult(truncatedText, result);

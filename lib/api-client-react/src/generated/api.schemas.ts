@@ -271,6 +271,72 @@ export interface TriageRecommendation {
   revision?: RevisionResult | null;
 }
 
+export interface ReproStep {
+  order: number;
+  instruction: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface ReproGuidance {
+  vulnClass: string;
+  confidence: number;
+  steps: ReproStep[];
+  environment: string[];
+  tools: string[];
+}
+
+export type GapItemSeverity =
+  (typeof GapItemSeverity)[keyof typeof GapItemSeverity];
+
+export const GapItemSeverity = {
+  critical: "critical",
+  important: "important",
+  minor: "minor",
+} as const;
+
+export interface GapItem {
+  category: string;
+  severity: GapItemSeverity;
+  description: string;
+  suggestion: string;
+}
+
+export interface DontMissItem {
+  area: string;
+  warning: string;
+  reason: string;
+}
+
+export type ReporterFeedbackItemTone =
+  (typeof ReporterFeedbackItemTone)[keyof typeof ReporterFeedbackItemTone];
+
+export const ReporterFeedbackItemTone = {
+  positive: "positive",
+  neutral: "neutral",
+  concern: "concern",
+} as const;
+
+export interface ReporterFeedbackItem {
+  tone: ReporterFeedbackItemTone;
+  message: string;
+}
+
+export interface LLMTriageGuidance {
+  reproSteps: string[];
+  missingInfo: string[];
+  dontMiss: string[];
+  reporterFeedback: string;
+}
+
+export interface TriageAssistant {
+  reproGuidance?: ReproGuidance | null;
+  gaps: GapItem[];
+  dontMiss: DontMissItem[];
+  reporterFeedback: ReporterFeedbackItem[];
+  llmTriageGuidance?: LLMTriageGuidance | null;
+}
+
 export interface ReportAnalysis {
   id: number;
   /** Secret token for deleting this report. Only returned on initial submission. Store it — it cannot be recovered. */
@@ -334,6 +400,8 @@ export interface ReportAnalysis {
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
   triageRecommendation?: TriageRecommendation | null;
+  /** AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed. */
+  triageAssistant?: TriageAssistant | null;
   /** @nullable */
   fileName?: string | null;
   fileSize: number;
@@ -419,6 +487,8 @@ export interface CheckResult {
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
   triageRecommendation?: TriageRecommendation | null;
+  /** AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed. */
+  triageAssistant?: TriageAssistant | null;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;
   /**

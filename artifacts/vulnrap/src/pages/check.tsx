@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp, Leaf, MessageSquareWarning, Copy, RefreshCw, Fingerprint, Timer } from "lucide-react";
-import { useCheckReport, type Verification, type VerificationCheck, type VerificationSummary, type TriageRecommendation, type ChallengeQuestion, type TemporalSignal, type TemplateMatch, type RevisionResult, type CheckReportBody } from "@workspace/api-client-react";
+import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp, Leaf, MessageSquareWarning, Copy, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck } from "lucide-react";
+import { useCheckReport, type Verification, type VerificationCheck, type VerificationSummary, type TriageRecommendation, type ChallengeQuestion, type TemporalSignal, type TemplateMatch, type RevisionResult, type CheckReportBody, type TriageAssistant, type GapItem } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -256,6 +256,7 @@ interface CheckResultData {
   existingReportId?: number | null;
   verification?: Verification;
   triageRecommendation?: TriageRecommendation;
+  triageAssistant?: TriageAssistant;
 }
 
 export default function Check() {
@@ -764,6 +765,98 @@ export default function Check() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+            );
+          })()}
+
+          {result.triageAssistant && (() => {
+            const ta = result.triageAssistant;
+            const severityColor = (s: string) => s === "critical" ? "text-destructive" : s === "important" ? "text-yellow-500" : "text-blue-400";
+            const severityBg = (s: string) => s === "critical" ? "bg-destructive/5 border-destructive/15" : s === "important" ? "bg-yellow-500/5 border-yellow-500/15" : "bg-blue-500/5 border-blue-500/15";
+            return (
+            <Card className="glass-card rounded-xl border-indigo-500/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Crosshair className="w-4 h-4 text-indigo-400" />
+                  Triage Assistant
+                  {ta.llmTriageGuidance && (
+                    <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px] px-1.5 py-0 h-4 flex items-center gap-1 normal-case">
+                      <Brain className="w-2.5 h-2.5" />AI
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-xs">Reproduction guidance, gaps, and reporter assessment</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {ta.reproGuidance && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="border-indigo-500/40 text-indigo-400 text-[10px]">{ta.reproGuidance.vulnClass}</Badge>
+                      <span className="text-[10px] text-muted-foreground">{(ta.reproGuidance.confidence * 100).toFixed(0)}% confidence</span>
+                    </div>
+                    {ta.reproGuidance.steps.map((step) => (
+                      <div key={step.order} className="flex items-start gap-2 glass-card rounded-lg p-2.5">
+                        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-[10px] font-bold text-indigo-400">{step.order}</div>
+                        <div className="flex-1"><p className="text-xs leading-relaxed">{step.instruction}</p></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {ta.gaps.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-xs font-bold flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5 text-indigo-400" />Gaps ({ta.gaps.length})</h4>
+                    {ta.gaps.map((gap, i) => (
+                      <div key={i} className={`rounded-lg border p-2.5 ${severityBg(gap.severity)}`}>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <Badge variant="outline" className={`text-[9px] px-1 py-0 h-3.5 uppercase ${severityColor(gap.severity)}`}>{gap.severity}</Badge>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{gap.category.replace(/_/g, " ")}</span>
+                        </div>
+                        <p className="text-xs leading-relaxed">{gap.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {ta.dontMiss.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-xs font-bold flex items-center gap-1.5"><Microscope className="w-3.5 h-3.5 text-orange-400" />Don't Miss ({ta.dontMiss.length})</h4>
+                    {ta.dontMiss.map((item, i) => (
+                      <div key={i} className="rounded-lg border border-orange-500/15 bg-orange-500/5 p-2.5">
+                        <span className="text-xs font-medium">{item.area}</span>
+                        <p className="text-xs text-muted-foreground">{item.warning}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {ta.reporterFeedback.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-xs font-bold flex items-center gap-1.5"><UserCheck className="w-3.5 h-3.5 text-blue-400" />Reporter</h4>
+                    {ta.reporterFeedback.map((fb, i) => (
+                      <div key={i} className={`rounded-lg border p-2.5 text-xs ${fb.tone === "positive" ? "bg-green-500/5 border-green-500/15" : fb.tone === "concern" ? "bg-yellow-500/5 border-yellow-500/15" : "bg-blue-500/5 border-blue-500/15"}`}>
+                        {fb.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1 w-full" onClick={() => {
+                  const lines: string[] = ["# Triage Assistant", ""];
+                  if (ta.reproGuidance) {
+                    lines.push(`## Reproduce (${ta.reproGuidance.vulnClass})`);
+                    ta.reproGuidance.steps.forEach(s => lines.push(`${s.order}. ${s.instruction}`));
+                    lines.push("");
+                  }
+                  if (ta.gaps.length > 0) { lines.push("## Gaps"); ta.gaps.forEach(g => lines.push(`- [${g.severity}] ${g.description}`)); lines.push(""); }
+                  if (ta.dontMiss.length > 0) { lines.push("## Don't Miss"); ta.dontMiss.forEach(d => lines.push(`- ${d.area}: ${d.warning}`)); lines.push(""); }
+                  if (ta.reporterFeedback.length > 0) { lines.push("## Reporter"); ta.reporterFeedback.forEach(f => lines.push(`- ${f.message}`)); lines.push(""); }
+                  navigator.clipboard.writeText(lines.join("\n"));
+                  toast({ title: "Copied", description: "Triage assistant summary copied." });
+                }}>
+                  <Copy className="w-3 h-3" /> Copy Summary
+                </Button>
               </CardContent>
             </Card>
             );

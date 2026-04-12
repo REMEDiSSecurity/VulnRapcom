@@ -395,6 +395,66 @@ export const GetReportResponse = zod.object({
     .describe(
       "Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.",
     ),
+  triageAssistant: zod
+    .union([
+      zod.object({
+        reproGuidance: zod
+          .union([
+            zod.object({
+              vulnClass: zod.string(),
+              confidence: zod.number(),
+              steps: zod.array(
+                zod.object({
+                  order: zod.number(),
+                  instruction: zod.string(),
+                  note: zod.string().nullish(),
+                }),
+              ),
+              environment: zod.array(zod.string()),
+              tools: zod.array(zod.string()),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+        gaps: zod.array(
+          zod.object({
+            category: zod.string(),
+            severity: zod.enum(["critical", "important", "minor"]),
+            description: zod.string(),
+            suggestion: zod.string(),
+          }),
+        ),
+        dontMiss: zod.array(
+          zod.object({
+            area: zod.string(),
+            warning: zod.string(),
+            reason: zod.string(),
+          }),
+        ),
+        reporterFeedback: zod.array(
+          zod.object({
+            tone: zod.enum(["positive", "neutral", "concern"]),
+            message: zod.string(),
+          }),
+        ),
+        llmTriageGuidance: zod
+          .union([
+            zod.object({
+              reproSteps: zod.array(zod.string()),
+              missingInfo: zod.array(zod.string()),
+              dontMiss: zod.array(zod.string()),
+              reporterFeedback: zod.string(),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+      }),
+      zod.null(),
+    ])
+    .optional()
+    .describe(
+      "AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed.",
+    ),
   fileName: zod.string().nullish(),
   fileSize: zod.number(),
   createdAt: zod.coerce.date(),
@@ -820,6 +880,66 @@ export const CheckReportResponse = zod.object({
     .optional()
     .describe(
       "Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.",
+    ),
+  triageAssistant: zod
+    .union([
+      zod.object({
+        reproGuidance: zod
+          .union([
+            zod.object({
+              vulnClass: zod.string(),
+              confidence: zod.number(),
+              steps: zod.array(
+                zod.object({
+                  order: zod.number(),
+                  instruction: zod.string(),
+                  note: zod.string().nullish(),
+                }),
+              ),
+              environment: zod.array(zod.string()),
+              tools: zod.array(zod.string()),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+        gaps: zod.array(
+          zod.object({
+            category: zod.string(),
+            severity: zod.enum(["critical", "important", "minor"]),
+            description: zod.string(),
+            suggestion: zod.string(),
+          }),
+        ),
+        dontMiss: zod.array(
+          zod.object({
+            area: zod.string(),
+            warning: zod.string(),
+            reason: zod.string(),
+          }),
+        ),
+        reporterFeedback: zod.array(
+          zod.object({
+            tone: zod.enum(["positive", "neutral", "concern"]),
+            message: zod.string(),
+          }),
+        ),
+        llmTriageGuidance: zod
+          .union([
+            zod.object({
+              reproSteps: zod.array(zod.string()),
+              missingInfo: zod.array(zod.string()),
+              dontMiss: zod.array(zod.string()),
+              reporterFeedback: zod.string(),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+      }),
+      zod.null(),
+    ])
+    .optional()
+    .describe(
+      "AI triage assistant with reproduction guidance, gap analysis, don't-miss warnings, and reporter feedback. Null when not computed.",
     ),
   previouslySubmitted: zod
     .boolean()
