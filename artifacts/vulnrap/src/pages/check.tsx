@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2 } from "lucide-react";
+import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useCheckReport } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -48,6 +48,24 @@ function getSlopProgressColor(score: number) {
   return "bg-destructive";
 }
 
+function getQualityColor(score: number) {
+  if (score >= 70) return "text-green-500";
+  if (score >= 40) return "text-yellow-500";
+  return "text-destructive";
+}
+
+function getConfidenceLabel(confidence: number): string {
+  if (confidence >= 0.8) return "High";
+  if (confidence >= 0.5) return "Medium";
+  return "Low";
+}
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 0.8) return "text-green-400";
+  if (confidence >= 0.5) return "text-yellow-400";
+  return "text-orange-400";
+}
+
 const REDACTION_LABELS: Record<string, string> = {
   email: "Email Addresses", ipv4: "IPv4 Addresses", ipv6: "IPv6 Addresses",
   api_key: "API Keys", bearer_token: "Bearer Tokens", jwt: "JWT Tokens",
@@ -58,9 +76,36 @@ const REDACTION_LABELS: Record<string, string> = {
   internal_url: "Internal URLs", company_name: "Company Names", username: "Usernames",
 };
 
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+  ai_phrase: "AI Phrase Detected",
+  template_match: "Template Pattern",
+  severity_inflation: "Severity Inflation",
+  invalid_cvss: "Invalid CVSS Score",
+  cwe_stuffing: "CWE Stuffing",
+  taxonomy_padding: "Taxonomy Padding",
+  placeholder_url: "Placeholder URL",
+  generic_path: "Generic API Path",
+  fake_asan: "Fabricated ASan Output",
+  repeating_stack: "Repeating Stack Frames",
+  fake_registers: "Fabricated Register Dump",
+  uniform_http: "Uniform HTTP Responses",
+  future_cve: "Future CVE Year",
+  invalid_cve_year: "Invalid CVE Year",
+  cve_cluster: "CVE Year Clustering",
+  fabricated_cve: "Fabricated CVE",
+  hallucinated_function: "Hallucinated Function",
+  statistical: "Statistical Signal",
+};
+
 interface CheckResultData {
   slopScore: number;
   slopTier: string;
+  qualityScore?: number;
+  confidence?: number;
+  breakdown?: { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number };
+  evidence?: Array<{ type: string; description: string; weight: number; matched?: string | null }>;
+  llmBreakdown?: { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number };
+  llmEnhanced?: boolean;
   similarityMatches: Array<{ reportId: number; similarity: number; matchType: string }>;
   sectionHashes: Record<string, string>;
   sectionMatches: Array<{ sectionTitle: string; matchedReportId: number; matchedSectionTitle: string; similarity: number }>;
@@ -80,6 +125,7 @@ export default function Check() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<CheckResultData | null>(null);
+  const [showAllEvidence, setShowAllEvidence] = useState(false);
 
   const checkMutation = useCheckReport({
     mutation: {
@@ -146,6 +192,10 @@ export default function Check() {
   };
 
   const hasContent = inputMode === "file" ? !!file : inputMode === "link" ? reportUrl.trim().length > 0 : rawText.trim().length > 0;
+
+  const visibleEvidence = result?.evidence && result.evidence.length > 0
+    ? (showAllEvidence ? result.evidence : result.evidence.slice(0, 5))
+    : [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
@@ -326,12 +376,50 @@ export default function Check() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="glass-card-accent rounded-xl">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">AI Sloppiness Score</CardTitle>
+                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  AI Detection
+                  {result.llmEnhanced ? (
+                    <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px] px-1.5 py-0 h-4 normal-case">LLM</Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-violet-500/40 text-violet-400/70 text-[10px] px-1.5 py-0 h-4 normal-case">Heuristic</Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center py-4">
-                <div className={`text-5xl font-bold font-mono ${getSlopColor(result.slopScore)} glow-text`}>{result.slopScore}</div>
-                <div className="mt-2 text-sm font-medium uppercase">{result.slopTier}</div>
-                <div className="w-full max-w-xs mt-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex flex-col items-center">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Slop</div>
+                    <div className={`text-4xl font-bold font-mono ${getSlopColor(result.slopScore)} glow-text`}>{result.slopScore}</div>
+                    <div className="mt-1 text-xs font-medium uppercase">{result.slopTier}</div>
+                  </div>
+                  {result.qualityScore != null && (
+                    <>
+                      <div className="h-14 w-px bg-border/30" />
+                      <div className="flex flex-col items-center">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Quality</div>
+                        <div className={`text-4xl font-bold font-mono ${getQualityColor(result.qualityScore)} glow-text`}>{result.qualityScore}</div>
+                        <div className="mt-1 text-xs font-medium uppercase text-muted-foreground">
+                          {result.qualityScore >= 70 ? "Good" : result.qualityScore >= 40 ? "Fair" : "Poor"}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {result.confidence != null && (
+                  <div className="w-full max-w-xs mt-3 flex items-center gap-2">
+                    <Gauge className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 space-y-0.5">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-muted-foreground">Confidence</span>
+                        <span className={`font-mono font-bold ${getConfidenceColor(result.confidence)}`}>
+                          {(result.confidence * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <Progress value={result.confidence * 100} className="h-1" indicatorClassName={result.confidence >= 0.8 ? "bg-green-500" : result.confidence >= 0.5 ? "bg-yellow-500" : "bg-orange-500"} />
+                    </div>
+                  </div>
+                )}
+                <div className="w-full max-w-xs mt-3">
                   <Progress value={result.slopScore} className="h-2" indicatorClassName={getSlopProgressColor(result.slopScore)} />
                 </div>
               </CardContent>
@@ -366,6 +454,90 @@ export default function Check() {
               </CardContent>
             </Card>
           </div>
+
+          {result.breakdown && (
+            <Card className="glass-card rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Axis Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  {[
+                    { label: "Linguistic", score: result.breakdown.linguistic ?? 0, icon: <Cpu className="w-3 h-3" /> },
+                    { label: "Factual", score: result.breakdown.factual ?? 0, icon: <Target className="w-3 h-3" /> },
+                    { label: "Template", score: result.breakdown.template ?? 0, icon: <FileText className="w-3 h-3" /> },
+                  ].map(({ label, score, icon }) => (
+                    <div key={label} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-1 text-muted-foreground">{icon}{label}</span>
+                        <span className={`font-mono font-bold ${score >= 50 ? "text-destructive" : score >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
+                      </div>
+                      <Progress value={score} className="h-1.5" indicatorClassName={score >= 50 ? "bg-destructive" : score >= 25 ? "bg-yellow-500" : "bg-green-500"} />
+                    </div>
+                  ))}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1 text-muted-foreground"><Brain className="w-3 h-3" />LLM</span>
+                      {result.breakdown.llm != null ? (
+                        <span className={`font-mono font-bold ${result.breakdown.llm >= 50 ? "text-destructive" : result.breakdown.llm >= 25 ? "text-yellow-500" : "text-green-500"}`}>{result.breakdown.llm}</span>
+                      ) : (
+                        <span className="font-mono text-muted-foreground/50 text-[10px]">N/A</span>
+                      )}
+                    </div>
+                    <Progress value={result.breakdown.llm ?? 0} className="h-1.5" indicatorClassName={result.breakdown.llm != null ? (result.breakdown.llm >= 50 ? "bg-destructive" : result.breakdown.llm >= 25 ? "bg-yellow-500" : "bg-green-500") : "bg-muted"} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {result.evidence && result.evidence.length > 0 && (
+            <Card className="glass-card rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <AlertCircle className="w-4 h-4 text-primary" />
+                  Evidence Signals
+                  <Badge variant="outline" className="text-[10px]">{result.evidence.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {visibleEvidence.map((item, i) => (
+                  <div key={i} className="glass-card rounded-lg p-2.5 flex items-start gap-2.5">
+                    <Badge
+                      variant={item.weight >= 10 ? "destructive" : "secondary"}
+                      className="text-[9px] px-1 py-0 h-4 font-mono flex-shrink-0 mt-0.5"
+                    >
+                      w:{item.weight}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {EVIDENCE_TYPE_LABELS[item.type] || item.type}
+                      </span>
+                      <p className="text-xs leading-relaxed">{item.description}</p>
+                      {item.matched && (
+                        <span className="inline-block mt-0.5 text-[10px] font-mono text-primary/70 bg-primary/5 rounded px-1 py-0.5 truncate max-w-full">
+                          {item.matched}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {result.evidence.length > 5 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-muted-foreground"
+                    onClick={() => setShowAllEvidence(!showAllEvidence)}
+                  >
+                    {showAllEvidence ? <><ChevronUp className="w-3 h-3 mr-1" /> Show fewer</> : <><ChevronDown className="w-3 h-3 mr-1" /> Show all {result.evidence.length}</>}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {result.redactionSummary.totalRedactions > 0 && (
             <Card className="glass-card rounded-xl" style={{ borderColor: "rgba(34, 197, 94, 0.15)" }}>
@@ -437,6 +609,7 @@ export default function Check() {
                 setRawText("");
                 setFile(null);
                 setReportUrl("");
+                setShowAllEvidence(false);
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             >

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitCompare, Loader2, CheckCircle, AlertTriangle, Layers, Search, ShieldCheck, Lightbulb, HelpCircle } from "lucide-react";
+import { GitCompare, Loader2, CheckCircle, AlertTriangle, Layers, Search, ShieldCheck, Lightbulb, HelpCircle, BarChart3, Target, Brain, Cpu, FileText, Gauge, AlertCircle } from "lucide-react";
 import { useCheckReport } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,10 @@ import { getSettings, getSlopColorCustom, getSlopProgressColorCustom } from "@/l
 interface CompareResult {
   slopScore: number;
   slopTier: string;
+  qualityScore?: number;
+  confidence?: number;
+  breakdown?: { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number };
+  evidence?: Array<{ type: string; description: string; weight: number; matched?: string | null }>;
   feedback: string[];
   redactionSummary: { totalRedactions: number; categories: Record<string, number> };
   sectionHashes: Record<string, string>;
@@ -29,6 +33,18 @@ function Hint({ text }: { text: string }) {
       </span>
     </span>
   );
+}
+
+function getQualityColor(score: number) {
+  if (score >= 70) return "text-green-500";
+  if (score >= 40) return "text-yellow-500";
+  return "text-destructive";
+}
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 0.8) return "text-green-400";
+  if (confidence >= 0.5) return "text-yellow-400";
+  return "text-orange-400";
 }
 
 function computeSectionOverlap(
@@ -210,6 +226,7 @@ export default function Compare() {
             ].map(({ label, result }) => {
               const slopColor = getSlopColorCustom(result!.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
               const progressColor = getSlopProgressColorCustom(result!.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+              const bd = result!.breakdown;
               return (
                 <Card key={label} className="glass-card rounded-xl">
                   <CardHeader className="pb-2">
@@ -220,14 +237,75 @@ export default function Compare() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
-                      <div className={`text-4xl font-bold font-mono ${slopColor} glow-text`}>
-                        {result!.slopScore}
+                      <div className="flex flex-col items-center">
+                        <div className="text-[9px] text-muted-foreground uppercase">Slop</div>
+                        <div className={`text-3xl font-bold font-mono ${slopColor} glow-text`}>
+                          {result!.slopScore}
+                        </div>
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="text-sm font-medium uppercase">{result!.slopTier}</div>
+                      {result!.qualityScore != null && (
+                        <>
+                          <div className="h-10 w-px bg-border/30" />
+                          <div className="flex flex-col items-center">
+                            <div className="text-[9px] text-muted-foreground uppercase">Quality</div>
+                            <div className={`text-3xl font-bold font-mono ${getQualityColor(result!.qualityScore)}`}>
+                              {result!.qualityScore}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex-1 space-y-1 ml-2">
+                        <div className="text-xs font-medium uppercase">{result!.slopTier}</div>
                         <Progress value={result!.slopScore} className="h-1.5" indicatorClassName={progressColor} />
+                        {result!.confidence != null && (
+                          <div className="flex items-center gap-1 text-[10px]">
+                            <Gauge className="w-3 h-3 text-muted-foreground" />
+                            <span className={`font-mono ${getConfidenceColor(result!.confidence)}`}>
+                              {(result!.confidence * 100).toFixed(0)}% confidence
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    {bd && (
+                      <>
+                        <Separator className="bg-border/30" />
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <BarChart3 className="w-3 h-3 text-primary" />
+                            Breakdown
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            {[
+                              { label: "Ling", score: bd.linguistic ?? 0 },
+                              { label: "Fact", score: bd.factual ?? 0 },
+                              { label: "Tmpl", score: bd.template ?? 0 },
+                              { label: "LLM", score: bd.llm },
+                            ].map(({ label, score }) => (
+                              <div key={label} className="flex items-center justify-between text-[10px]">
+                                <span className="text-muted-foreground">{label}</span>
+                                {score != null ? (
+                                  <span className={`font-mono font-bold ${(score as number) >= 50 ? "text-destructive" : (score as number) >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
+                                ) : (
+                                  <span className="font-mono text-muted-foreground/50">N/A</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {result!.evidence && result!.evidence.length > 0 && (
+                      <>
+                        <Separator className="bg-border/30" />
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <AlertCircle className="w-3 h-3 text-primary" />
+                          {result!.evidence.length} evidence signal{result!.evidence.length !== 1 ? "s" : ""}
+                        </div>
+                      </>
+                    )}
 
                     {result!.redactionSummary.totalRedactions > 0 && (
                       <>

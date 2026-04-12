@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -24,6 +24,30 @@ function getSlopProgressColor(score: number) {
   if (score < 30) return "bg-green-500";
   if (score < 70) return "bg-yellow-500";
   return "bg-destructive";
+}
+
+function getQualityColor(score: number) {
+  if (score >= 70) return "text-green-500";
+  if (score >= 40) return "text-yellow-500";
+  return "text-destructive";
+}
+
+function getQualityProgressColor(score: number) {
+  if (score >= 70) return "bg-green-500";
+  if (score >= 40) return "bg-yellow-500";
+  return "bg-destructive";
+}
+
+function getConfidenceLabel(confidence: number): string {
+  if (confidence >= 0.8) return "High";
+  if (confidence >= 0.5) return "Medium";
+  return "Low";
+}
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 0.8) return "text-green-400";
+  if (confidence >= 0.5) return "text-yellow-400";
+  return "text-orange-400";
 }
 
 function Hint({ text }: { text: string }) {
@@ -68,6 +92,27 @@ const REDACTION_LABELS: Record<string, string> = {
   username: "Usernames",
 };
 
+const EVIDENCE_TYPE_LABELS: Record<string, string> = {
+  ai_phrase: "AI Phrase Detected",
+  template_match: "Template Pattern",
+  severity_inflation: "Severity Inflation",
+  invalid_cvss: "Invalid CVSS Score",
+  cwe_stuffing: "CWE Stuffing",
+  taxonomy_padding: "Taxonomy Padding",
+  placeholder_url: "Placeholder URL",
+  generic_path: "Generic API Path",
+  fake_asan: "Fabricated ASan Output",
+  repeating_stack: "Repeating Stack Frames",
+  fake_registers: "Fabricated Register Dump",
+  uniform_http: "Uniform HTTP Responses",
+  future_cve: "Future CVE Year",
+  invalid_cve_year: "Invalid CVE Year",
+  cve_cluster: "CVE Year Clustering",
+  fabricated_cve: "Fabricated CVE",
+  hallucinated_function: "Hallucinated Function",
+  statistical: "Statistical Signal",
+};
+
 function getDeleteToken(reportId: number): string | null {
   try {
     const tokens = JSON.parse(sessionStorage.getItem("vulnrap_delete_tokens") || "{}");
@@ -89,6 +134,34 @@ function SectionStatusBadge({ status }: { status: string }) {
   if (status === "identical") return <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">Identical</Badge>;
   if (status === "different") return <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">Different</Badge>;
   return <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 text-muted-foreground">Unique</Badge>;
+}
+
+function AxisBar({ label, score, icon, color }: { label: string; score: number; icon: React.ReactNode; color: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          {icon}
+          {label}
+        </span>
+        <span className={`font-mono font-bold ${score >= 50 ? "text-destructive" : score >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
+      </div>
+      <Progress value={score} className="h-1.5" indicatorClassName={color} />
+    </div>
+  );
+}
+
+function LlmDimensionBar({ label, score }: { label: string; score: number }) {
+  const color = score >= 50 ? "bg-destructive" : score >= 25 ? "bg-yellow-500" : "bg-green-500";
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={`font-mono font-bold ${score >= 50 ? "text-destructive" : score >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
+      </div>
+      <Progress value={score} className="h-1" indicatorClassName={color} />
+    </div>
+  );
 }
 
 function ComparePanel({ reportId, matchId, matchSimilarity, matchType, settings }: { reportId: number; matchId: number; matchSimilarity: number; matchType: string; settings: VulnRapSettings }) {
@@ -194,6 +267,7 @@ export default function Results() {
   const [showFullReport, setShowFullReport] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expandedCompare, setExpandedCompare] = useState<number | null>(null);
+  const [showAllEvidence, setShowAllEvidence] = useState(false);
   const deleteToken = getDeleteToken(id);
 
   const deleteMutation = useDeleteReport({
@@ -230,18 +304,47 @@ export default function Results() {
 
   const exportText = () => {
     if (!report) return;
+    const bd = report.breakdown as { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number } | undefined;
+    const ev = report.evidence as Array<{ type: string; description: string; weight: number; matched?: string | null }> | undefined;
+    const llmBd = report.llmBreakdown as { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number } | undefined;
     const lines: string[] = [
       `VulnRap Analysis Report — ${anonymizeId(id)}`,
       `Generated: ${new Date().toISOString()}`,
       ``,
-      `SLOP SCORE: ${report.slopScore}/100 (${report.slopTier})`,
-      report.llmEnhanced ? `Analysis: LLM-Enhanced (40% heuristic + 60% LLM)` : `Analysis: Heuristic Only`,
+      `SLOP SCORE (AI Detection): ${report.slopScore}/100 (${report.slopTier})`,
     ];
-    if (report.llmEnhanced && report.llmSlopScore != null) {
-      lines.push(`  Heuristic Score: ${Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4)}`);
-      lines.push(`  LLM Score: ${report.llmSlopScore}`);
+    if (report.qualityScore != null) {
+      lines.push(`QUALITY SCORE (Report Completeness): ${report.qualityScore}/100`);
+    }
+    if (report.confidence != null) {
+      lines.push(`CONFIDENCE: ${(report.confidence * 100).toFixed(0)}% (${getConfidenceLabel(report.confidence)})`);
     }
     lines.push(``);
+    if (bd) {
+      lines.push(`AXIS BREAKDOWN:`);
+      lines.push(`  Linguistic: ${bd.linguistic ?? "N/A"}/100`);
+      lines.push(`  Factual: ${bd.factual ?? "N/A"}/100`);
+      lines.push(`  Template: ${bd.template ?? "N/A"}/100`);
+      lines.push(`  LLM: ${bd.llm != null ? `${bd.llm}/100` : "N/A (not available)"}`);
+      lines.push(`  Quality: ${bd.quality ?? "N/A"}/100`);
+      lines.push(``);
+    }
+    if (llmBd && report.llmEnhanced) {
+      lines.push(`LLM DIMENSIONS:`);
+      if (llmBd.specificity != null) lines.push(`  Specificity: ${llmBd.specificity}/100`);
+      if (llmBd.originality != null) lines.push(`  Originality: ${llmBd.originality}/100`);
+      if (llmBd.voice != null) lines.push(`  Voice: ${llmBd.voice}/100`);
+      if (llmBd.coherence != null) lines.push(`  Coherence: ${llmBd.coherence}/100`);
+      if (llmBd.hallucination != null) lines.push(`  Hallucination: ${llmBd.hallucination}/100`);
+      lines.push(``);
+    }
+    if (ev && ev.length > 0) {
+      lines.push(`EVIDENCE (${ev.length} signals):`);
+      ev.forEach((e) => {
+        lines.push(`  [${EVIDENCE_TYPE_LABELS[e.type] || e.type}] (weight: ${e.weight}) ${e.description}${e.matched ? ` — matched: "${e.matched}"` : ""}`);
+      });
+      lines.push(``);
+    }
     lines.push(`FILE: ${report.fileName || "Unknown"} (${(report.fileSize / 1024).toFixed(2)} KB)`);
     lines.push(`HASH: ${report.contentHash}`);
     lines.push(`MODE: ${report.contentMode}`);
@@ -358,9 +461,18 @@ export default function Results() {
   const sectionHashes = report.sectionHashes as Record<string, string> | undefined;
   const sectionMatches = report.sectionMatches as Array<{ sectionTitle: string; matchedReportId: number; matchedSectionTitle: string; similarity: number }> | undefined;
   const redactionSummary = report.redactionSummary as { totalRedactions: number; categories: Record<string, number> } | undefined;
+  const breakdown = report.breakdown as { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number } | undefined;
+  const evidence = report.evidence as Array<{ type: string; description: string; weight: number; matched?: string | null }> | undefined;
+  const llmBreakdown = report.llmBreakdown as { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number } | undefined;
+  const qualityScore = report.qualityScore as number | undefined;
+  const confidence = report.confidence as number | undefined;
 
   const slopColor = getSlopColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
   const slopProgressColor = getSlopProgressColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+
+  const visibleEvidence = evidence && evidence.length > 0
+    ? (showAllEvidence ? evidence : evidence.slice(0, 6))
+    : [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
@@ -442,7 +554,7 @@ export default function Results() {
         <Card className="md:col-span-2 glass-card-accent rounded-xl">
           <CardHeader>
             <CardTitle className="uppercase tracking-wide text-sm text-muted-foreground flex items-center gap-2">
-              AI Sloppiness Score
+              AI Detection Score
               {report.llmEnhanced ? (
                 <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px] px-1.5 py-0 h-4 flex items-center gap-1 normal-case">
                   <Brain className="w-2.5 h-2.5" />
@@ -454,46 +566,60 @@ export default function Results() {
                   Heuristic
                 </Badge>
               )}
-              <Hint text={report.llmEnhanced ? "Blended score: 40% heuristic rule engine + 60% LLM semantic analysis. Both layers ran simultaneously. See score breakdown below." : "Heuristic-only score — 0–100 based on phrase patterns, structural analysis, vocabulary diversity, and presence of technical details. LLM enhancement unavailable for this submission."} />
+              <Hint text="Multi-axis AI detection score fusing linguistic fingerprinting, factual verification, template detection, and LLM semantic analysis. Higher = more likely AI-generated." />
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
-            <div className={`text-7xl font-bold font-mono tracking-tighter ${slopColor} glow-text`}>
-              {report.slopScore}
+            <div className="flex items-center gap-8 w-full max-w-lg justify-center">
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">AI Likelihood</div>
+                <div className={`text-6xl font-bold font-mono tracking-tighter ${slopColor} glow-text`}>
+                  {report.slopScore}
+                </div>
+                <div className="mt-2 text-sm font-medium tracking-wide uppercase">
+                  {report.slopTier}
+                </div>
+              </div>
+              {qualityScore != null && (
+                <>
+                  <div className="h-20 w-px bg-border/30" />
+                  <div className="flex flex-col items-center">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Report Quality</div>
+                    <div className={`text-6xl font-bold font-mono tracking-tighter ${getQualityColor(qualityScore)} glow-text`}>
+                      {qualityScore}
+                    </div>
+                    <div className="mt-2 text-sm font-medium tracking-wide uppercase text-muted-foreground">
+                      {qualityScore >= 70 ? "Good" : qualityScore >= 40 ? "Fair" : "Poor"}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="mt-4 text-xl font-medium tracking-wide uppercase">
-              {report.slopTier}
-            </div>
-            <div className="w-full max-w-md mt-8 space-y-2">
+
+            {confidence != null && (
+              <div className="w-full max-w-md mt-5 flex items-center gap-3">
+                <Gauge className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Confidence</span>
+                    <span className={`font-mono font-bold ${getConfidenceColor(confidence)}`}>
+                      {(confidence * 100).toFixed(0)}% — {getConfidenceLabel(confidence)}
+                    </span>
+                  </div>
+                  <Progress value={confidence * 100} className="h-1.5" indicatorClassName={confidence >= 0.8 ? "bg-green-500" : confidence >= 0.5 ? "bg-yellow-500" : "bg-orange-500"} />
+                </div>
+              </div>
+            )}
+
+            <div className="w-full max-w-md mt-4 space-y-2">
               <div className="flex justify-between text-xs text-muted-foreground font-mono">
                 <span>0 (Human)</span>
                 <span>100 (Pure AI Slop)</span>
               </div>
               <Progress value={report.slopScore} className="h-2" indicatorClassName={slopProgressColor} />
             </div>
-            {report.llmEnhanced && report.llmSlopScore != null && (
-              <div className="w-full max-w-md mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-violet-500/5 border border-violet-500/15 px-3 py-2 text-center">
-                  <div className="text-[10px] text-violet-400 uppercase tracking-wide mb-1 flex items-center justify-center gap-1">
-                    <Cpu className="w-2.5 h-2.5" />
-                    Heuristic
-                  </div>
-                  <div className={`text-lg font-bold font-mono ${getSlopColorCustom(Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4), settings.slopThresholdLow, settings.slopThresholdHigh)}`}>
-                    {Math.round((report.slopScore - report.llmSlopScore * 0.6) / 0.4)}
-                  </div>
-                </div>
-                <div className="rounded-lg bg-cyan-500/5 border border-cyan-500/15 px-3 py-2 text-center">
-                  <div className="text-[10px] text-cyan-400 uppercase tracking-wide mb-1 flex items-center justify-center gap-1">
-                    <Brain className="w-2.5 h-2.5" />
-                    LLM
-                  </div>
-                  <div className={`text-lg font-bold font-mono ${getSlopColorCustom(report.llmSlopScore, settings.slopThresholdLow, settings.slopThresholdHigh)}`}>
-                    {report.llmSlopScore}
-                  </div>
-                </div>
-              </div>
-            )}
-            <p className="mt-6 text-xs text-muted-foreground text-center max-w-md leading-relaxed">
+
+            <p className="mt-5 text-xs text-muted-foreground text-center max-w-md leading-relaxed">
               {getSlopExplainer(report.slopScore)}
             </p>
           </CardContent>
@@ -535,6 +661,157 @@ export default function Results() {
           </CardContent>
         </Card>
       </div>
+
+      {breakdown && (
+        <Card className="glass-card rounded-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-primary" />
+              Axis Breakdown
+              <Hint text="Each axis measures a different dimension of AI detection. Linguistic = AI phrase patterns and statistical features. Factual = severity inflation, placeholder URLs, fabricated evidence. Template = known slop report templates. LLM = semantic analysis across 5 dimensions (if available)." />
+            </CardTitle>
+            <CardDescription>Per-axis scores from the multi-axis scoring engine</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+              <AxisBar
+                label="Linguistic"
+                score={breakdown.linguistic ?? 0}
+                icon={<Cpu className="w-3.5 h-3.5" />}
+                color={(breakdown.linguistic ?? 0) >= 50 ? "bg-destructive" : (breakdown.linguistic ?? 0) >= 25 ? "bg-yellow-500" : "bg-green-500"}
+              />
+              <AxisBar
+                label="Factual"
+                score={breakdown.factual ?? 0}
+                icon={<Target className="w-3.5 h-3.5" />}
+                color={(breakdown.factual ?? 0) >= 50 ? "bg-destructive" : (breakdown.factual ?? 0) >= 25 ? "bg-yellow-500" : "bg-green-500"}
+              />
+              <AxisBar
+                label="Template"
+                score={breakdown.template ?? 0}
+                icon={<FileText className="w-3.5 h-3.5" />}
+                color={(breakdown.template ?? 0) >= 50 ? "bg-destructive" : (breakdown.template ?? 0) >= 25 ? "bg-yellow-500" : "bg-green-500"}
+              />
+              {breakdown.llm != null ? (
+                <AxisBar
+                  label="LLM Analysis"
+                  score={breakdown.llm}
+                  icon={<Brain className="w-3.5 h-3.5" />}
+                  color={breakdown.llm >= 50 ? "bg-destructive" : breakdown.llm >= 25 ? "bg-yellow-500" : "bg-green-500"}
+                />
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Brain className="w-3.5 h-3.5" />
+                      LLM Analysis
+                    </span>
+                    <span className="font-mono text-muted-foreground/50 text-[10px]">N/A</span>
+                  </div>
+                  <Progress value={0} className="h-1.5" indicatorClassName="bg-muted" />
+                </div>
+              )}
+            </div>
+            {qualityScore != null && (
+              <>
+                <Separator className="bg-border/30" />
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Eye className="w-3.5 h-3.5" />
+                      Report Quality (separate from AI detection)
+                    </span>
+                    <span className={`font-mono font-bold ${getQualityColor(qualityScore)}`}>{qualityScore}</span>
+                  </div>
+                  <Progress value={qualityScore} className="h-1.5" indicatorClassName={getQualityProgressColor(qualityScore)} />
+                  <p className="text-[10px] text-muted-foreground mt-1">Measures report completeness (version info, code blocks, repro steps) — does not affect AI detection score.</p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {report.llmEnhanced && llmBreakdown && (
+        <Card className="glass-card rounded-xl border-cyan-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-cyan-400" />
+              LLM Dimension Scores
+              <Badge variant="outline" className="border-cyan-500/50 text-cyan-400 text-[10px] px-1.5 py-0 h-4 flex items-center gap-1 normal-case">
+                <Brain className="w-2.5 h-2.5" />
+                LLM Enhanced
+              </Badge>
+              <Hint text="Five semantic dimensions evaluated by the LLM: Specificity (technical detail), Originality (unique observations), Voice (natural writing style), Coherence (logical consistency), Hallucination (fabricated details). Higher = more AI-like." />
+            </CardTitle>
+            <CardDescription>Per-dimension LLM semantic analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+              {llmBreakdown.specificity != null && <LlmDimensionBar label="Specificity" score={llmBreakdown.specificity} />}
+              {llmBreakdown.originality != null && <LlmDimensionBar label="Originality" score={llmBreakdown.originality} />}
+              {llmBreakdown.voice != null && <LlmDimensionBar label="Voice" score={llmBreakdown.voice} />}
+              {llmBreakdown.coherence != null && <LlmDimensionBar label="Coherence" score={llmBreakdown.coherence} />}
+              {llmBreakdown.hallucination != null && <LlmDimensionBar label="Hallucination" score={llmBreakdown.hallucination} />}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {evidence && evidence.length > 0 && (
+        <Card className="glass-card rounded-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-primary" />
+              Evidence Signals
+              <Badge variant="outline" className="text-[10px]">{evidence.length} found</Badge>
+              <Hint text="Specific signals detected during analysis. Each signal has a weight indicating its significance. Higher-weight signals contribute more to the final score." />
+            </CardTitle>
+            <CardDescription>Specific indicators detected during multi-axis analysis</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {visibleEvidence.map((item, i) => (
+              <div key={i} className="glass-card rounded-lg p-3 flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <Badge
+                    variant={item.weight >= 10 ? "destructive" : "secondary"}
+                    className="text-[9px] px-1.5 py-0 h-4 font-mono"
+                  >
+                    w:{item.weight}
+                  </Badge>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      {EVIDENCE_TYPE_LABELS[item.type] || item.type}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed">{item.description}</p>
+                  {item.matched && (
+                    <span className="inline-block mt-1 text-xs font-mono text-primary/70 bg-primary/5 rounded px-1.5 py-0.5 truncate max-w-full">
+                      {item.matched}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {evidence.length > 6 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAllEvidence(!showAllEvidence)}
+              >
+                {showAllEvidence ? (
+                  <><ChevronUp className="w-3 h-3 mr-1" /> Show fewer</>
+                ) : (
+                  <><ChevronDown className="w-3 h-3 mr-1" /> Show all {evidence.length} signals</>
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {verification && (
         <Card className="glass-card-accent rounded-xl">
@@ -787,7 +1064,7 @@ export default function Results() {
                 <Brain className="w-2.5 h-2.5" />
                 LLM Enhanced
               </Badge>
-              <Hint text="Semantic observations from the LLM analyzer, evaluating reports from a PSIRT triage perspective. Covers technical specificity, PoC validity, target specificity, narrative credibility, and template/mass-submission signals. Score weighted at 60% in the final blend." />
+              <Hint text="Semantic observations from the LLM analyzer, evaluating reports from a PSIRT triage perspective. Covers specificity, originality, voice, coherence, and hallucination signals." />
             </CardTitle>
             <CardDescription>PSIRT triage observations across five credibility dimensions</CardDescription>
           </CardHeader>
