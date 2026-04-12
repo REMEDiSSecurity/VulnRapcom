@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * VulnRap.com API — Vulnerability Report Validation Platform
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 2.0.0
  */
 import * as zod from "zod";
 
@@ -186,6 +186,26 @@ export const GetReportResponse = zod.object({
     .describe(
       "Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.",
     ),
+  humanIndicators: zod
+    .array(
+      zod.object({
+        type: zod
+          .string()
+          .describe(
+            "Human indicator type (e.g. human_contractions, human_terse_style)",
+          ),
+        description: zod
+          .string()
+          .describe("Human-readable description of the human signal"),
+        weight: zod.number().describe("Negative weight (reduces slop score)"),
+        matched: zod
+          .string()
+          .nullish()
+          .describe("The specific text that triggered this indicator"),
+      }),
+    )
+    .optional()
+    .describe("Detected human-writing signals that reduced the slop score"),
   llmEnhanced: zod
     .boolean()
     .describe(
@@ -404,6 +424,26 @@ export const CheckReportResponse = zod.object({
       hallucination: zod.number().optional(),
     })
     .nullish(),
+  humanIndicators: zod
+    .array(
+      zod.object({
+        type: zod
+          .string()
+          .describe(
+            "Human indicator type (e.g. human_contractions, human_terse_style)",
+          ),
+        description: zod
+          .string()
+          .describe("Human-readable description of the human signal"),
+        weight: zod.number().describe("Negative weight (reduces slop score)"),
+        matched: zod
+          .string()
+          .nullish()
+          .describe("The specific text that triggered this indicator"),
+      }),
+    )
+    .optional()
+    .describe("Detected human-writing signals that reduced the slop score"),
   llmEnhanced: zod.boolean(),
   previouslySubmitted: zod
     .boolean()

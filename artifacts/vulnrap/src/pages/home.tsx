@@ -418,9 +418,9 @@ function SlopDetectionCard() {
         <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-5 animate-in fade-in slide-in-from-top-2 duration-200">
 
           <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-3 py-2.5 space-y-1">
-            <p className="text-[11px] font-bold text-violet-300 uppercase tracking-wide">Multi-Axis Score Fusion (v2.0)</p>
+            <p className="text-[11px] font-bold text-violet-300 uppercase tracking-wide">Multi-Axis Score Fusion (v2.1)</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Every report is analyzed across four independent axes: <span className="text-foreground font-mono">Linguistic (0.25) + Factual (0.30) + LLM (0.35) + Template (0.10)</span>. These are fused via Bayesian combination into a single slopScore. A separate qualityScore measures report completeness independently. If the LLM axis is unavailable, weights redistribute automatically. Fabrication evidence (fake CVEs, hallucinated functions) triggers dynamic weight boosting.
+              Every report is analyzed across four independent axes: <span className="text-foreground font-mono">Linguistic (0.25) + Factual (0.30) + LLM (0.35) + Template (0.10)</span>. Each axis score is converted to a probability and combined via <span className="text-foreground font-mono">Noisy-OR fusion: 1 - ∏(1 - p_i)</span> into a single slopScore. A separate qualityScore measures report completeness independently. If the LLM axis is unavailable, weights redistribute automatically. Fabrication evidence (fake CVEs, hallucinated functions) triggers a 1.3x boost on the factual axis. Human-writing signals (contractions, terse style, commit refs) reduce the score post-fusion.
             </p>
           </div>
 
@@ -484,7 +484,7 @@ function SlopDetectionCard() {
             </div>
             <div className="rounded-md bg-muted/20 px-3 py-2 mt-1">
               <p className="text-[10px] text-muted-foreground leading-relaxed">
-                <span className="text-foreground font-medium">Fusion:</span> LLM dimension scores are weighted (<span className="font-mono text-cyan-400">specificity×0.15 + originality×0.25 + voice×0.20 + coherence×0.15 + hallucination×0.25</span>) into the LLM axis score, which enters the Bayesian multi-axis fusion with weight 0.35. Per-dimension scores are shown on the results page.
+                <span className="text-foreground font-medium">Fusion:</span> LLM dimension scores are weighted (<span className="font-mono text-cyan-400">specificity×0.15 + originality×0.25 + voice×0.20 + coherence×0.15 + hallucination×0.25</span>) into the LLM axis score, which enters the Noisy-OR multi-axis fusion with weight 0.35. Per-dimension scores are shown on the results page.
               </p>
             </div>
           </div>
@@ -1100,7 +1100,7 @@ function TransparencySection() {
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">1.</span>Your raw text is received over HTTPS. For URLs, we fetch the content server-side (HTTPS only, allowlisted hosts).</li>
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">2.</span>The redaction engine runs immediately — regex patterns strip PII, secrets, credentials, and company names. The raw text is discarded and never stored.</li>
                 <li className="flex gap-2"><span className="text-violet-400 mt-0.5">3.</span>All analysis (hashing, similarity, slop scoring) runs on the redacted text only.</li>
-                <li className="flex gap-2"><span className="text-violet-400 mt-0.5">4.</span>The multi-axis scoring engine analyzes the original text in server memory for linguistic and factual analysis accuracy — this text is never written to disk or database. When the optional LLM axis is enabled, the redacted version is sent to the configured AI provider for semantic analysis. All axis scores are fused into a single slopScore via Bayesian combination.</li>
+                <li className="flex gap-2"><span className="text-violet-400 mt-0.5">4.</span>The multi-axis scoring engine analyzes the original text in server memory for linguistic and factual analysis accuracy — this text is never written to disk or database. When the optional LLM axis is enabled, the redacted version is sent to the configured AI provider for semantic analysis. All axis scores are fused into a single slopScore via Noisy-OR combination, with human-writing signals applied post-fusion.</li>
               </ul>
             </div>
           </div>

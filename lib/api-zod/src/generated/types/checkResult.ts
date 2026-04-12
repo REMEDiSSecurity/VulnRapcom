@@ -3,11 +3,12 @@
  * Do not edit manually.
  * Api
  * VulnRap.com API — Vulnerability Report Validation Platform
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 2.0.0
  */
 import type { CheckResultLlmBreakdown } from "./checkResultLlmBreakdown";
 import type { CheckResultSectionHashes } from "./checkResultSectionHashes";
 import type { EvidenceItem } from "./evidenceItem";
+import type { HumanIndicator } from "./humanIndicator";
 import type { RedactionSummary } from "./redactionSummary";
 import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
@@ -34,6 +35,8 @@ export interface CheckResult {
   llmFeedback?: string[] | null;
   /** @nullable */
   llmBreakdown?: CheckResultLlmBreakdown;
+  /** Detected human-writing signals that reduced the slop score */
+  humanIndicators?: HumanIndicator[];
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;

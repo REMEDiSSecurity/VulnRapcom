@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * VulnRap.com API — Vulnerability Report Validation Platform
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 2.0.0
  */
 
 export * from "./checkReportBody";
@@ -21,6 +21,7 @@ export * from "./feedbackResponse";
 export * from "./getReportFeedParams";
 export * from "./hashLookupResult";
 export * from "./healthStatus";
+export * from "./humanIndicator";
 export * from "./platformStats";
 export * from "./platformStatsReportsByMode";
 export * from "./recentActivity";

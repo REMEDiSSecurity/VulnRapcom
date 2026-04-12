@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp, Leaf } from "lucide-react";
 import { useCheckReport } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -125,6 +125,7 @@ interface CheckResultData {
   confidence?: number;
   breakdown?: { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number };
   evidence?: Array<{ type: string; description: string; weight: number; matched?: string | null }>;
+  humanIndicators?: Array<{ type: string; description: string; weight: number; matched?: string | null }>;
   llmBreakdown?: { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number };
   llmEnhanced?: boolean;
   similarityMatches: Array<{ reportId: number; similarity: number; matchType: string }>;
@@ -556,6 +557,38 @@ export default function Check() {
                     {showAllEvidence ? <><ChevronUp className="w-3 h-3 mr-1" /> Show fewer</> : <><ChevronDown className="w-3 h-3 mr-1" /> Show all {result.evidence.length}</>}
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {result.humanIndicators && result.humanIndicators.length > 0 && (
+            <Card className="glass-card rounded-xl" style={{ borderColor: "rgba(34, 197, 94, 0.15)" }}>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Leaf className="w-4 h-4 text-green-400" />
+                  Human Signals
+                  <Badge variant="outline" className="text-[10px] border-green-500/40 text-green-400">{result.humanIndicators.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {result.humanIndicators.map((item, i) => (
+                  <div key={i} className="rounded-lg bg-green-500/5 border border-green-500/10 p-2.5 flex items-start gap-2.5">
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 font-mono flex-shrink-0 mt-0.5 border-green-500/40 text-green-400">
+                      {item.weight}
+                    </Badge>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-green-400/70">
+                        {EVIDENCE_TYPE_LABELS[item.type] || item.type}
+                      </span>
+                      <p className="text-xs leading-relaxed">{item.description}</p>
+                      {item.matched && (
+                        <span className="inline-block mt-0.5 text-[10px] font-mono text-green-400/70 bg-green-500/5 rounded px-1 py-0.5 truncate max-w-full">
+                          {item.matched}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           )}

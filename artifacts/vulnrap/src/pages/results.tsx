@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import FeedbackForm from "@/components/feedback-form";
 import { anonymizeId } from "@/lib/utils";
 import { SettingsButton } from "@/components/settings-panel";
-import { getSettings, getSlopColorCustom, getSlopProgressColorCustom, type VulnRapSettings } from "@/lib/settings";
+import { getSettings, saveSettings, getSlopColorCustom, getSlopProgressColorCustom, adjustScore, adjustTier, SENSITIVITY_PRESETS, type VulnRapSettings, type SensitivityPreset } from "@/lib/settings";
 
 function getQualityColor(score: number) {
   if (score >= 70) return "text-green-500";
@@ -264,6 +264,11 @@ export default function Results() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expandedCompare, setExpandedCompare] = useState<number | null>(null);
   const [showAllEvidence, setShowAllEvidence] = useState(false);
+  const [sensitivity, setSensitivity] = useState<SensitivityPreset>(() => getSettings().sensitivityPreset);
+  const handleSensitivityChange = (preset: SensitivityPreset) => {
+    setSensitivity(preset);
+    saveSettings({ sensitivityPreset: preset });
+  };
   const deleteToken = getDeleteToken(id);
 
   const deleteMutation = useDeleteReport({
@@ -309,6 +314,9 @@ export default function Results() {
       ``,
       `SLOP SCORE (AI Detection): ${report.slopScore}/100 (${report.slopTier})`,
     ];
+    if (isAdjusted) {
+      lines.push(`ADJUSTED SCORE (${SENSITIVITY_PRESETS[sensitivity].label}): ${displayScore}/100 (${displayTier})`);
+    }
     if (report.qualityScore != null) {
       lines.push(`QUALITY SCORE (Report Completeness): ${report.qualityScore}/100`);
     }
@@ -460,11 +468,16 @@ export default function Results() {
   const breakdown = report.breakdown as { linguistic?: number; factual?: number; template?: number; llm?: number | null; quality?: number } | undefined;
   const evidence = report.evidence as Array<{ type: string; description: string; weight: number; matched?: string | null }> | undefined;
   const llmBreakdown = report.llmBreakdown as { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number } | undefined;
+  const humanIndicators = (report.humanIndicators ?? []) as Array<{ type: string; description: string; weight: number; matched?: string | null }>;
   const qualityScore = report.qualityScore as number | undefined;
   const confidence = report.confidence as number | undefined;
 
-  const slopColor = getSlopColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
-  const slopProgressColor = getSlopProgressColorCustom(report.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+  const adjusted = adjustScore(report.slopScore, sensitivity);
+  const isAdjusted = sensitivity !== "balanced";
+  const displayScore = isAdjusted ? adjusted : report.slopScore;
+  const displayTier = isAdjusted ? adjustTier(adjusted, settings.slopThresholdLow, settings.slopThresholdHigh) : report.slopTier;
+  const slopColor = getSlopColorCustom(displayScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+  const slopProgressColor = getSlopProgressColorCustom(displayScore, settings.slopThresholdLow, settings.slopThresholdHigh);
 
   const visibleEvidence = evidence && evidence.length > 0
     ? (showAllEvidence ? evidence : evidence.slice(0, 6))
@@ -566,15 +579,37 @@ export default function Results() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
+            <div className="flex items-center justify-center gap-1 mb-4">
+              {(Object.entries(SENSITIVITY_PRESETS) as [SensitivityPreset, { label: string; description: string }][]).map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleSensitivityChange(key)}
+                  className={`px-3 py-1 text-[10px] font-medium rounded-md transition-all ${
+                    sensitivity === key
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted/30"
+                  }`}
+                  title={preset.description}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-8 w-full max-w-lg justify-center">
               <div className="flex flex-col items-center">
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">AI Likelihood</div>
                 <div className={`text-6xl font-bold font-mono tracking-tighter ${slopColor} glow-text`}>
-                  {report.slopScore}
+                  {displayScore}
                 </div>
                 <div className="mt-2 text-sm font-medium tracking-wide uppercase">
-                  {report.slopTier}
+                  {displayTier}
                 </div>
+                {isAdjusted && (
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    canonical: {report.slopScore} ({report.slopTier})
+                  </div>
+                )}
               </div>
               {qualityScore != null && (
                 <>
@@ -612,11 +647,11 @@ export default function Results() {
                 <span>0 (Human)</span>
                 <span>100 (Pure AI Slop)</span>
               </div>
-              <Progress value={report.slopScore} className="h-2" indicatorClassName={slopProgressColor} />
+              <Progress value={displayScore} className="h-2" indicatorClassName={slopProgressColor} />
             </div>
 
             <p className="mt-5 text-xs text-muted-foreground text-center max-w-md leading-relaxed">
-              {getSlopExplainer(report.slopScore)}
+              {getSlopExplainer(displayScore)}
             </p>
           </CardContent>
         </Card>
@@ -805,6 +840,42 @@ export default function Results() {
                 )}
               </Button>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {humanIndicators.length > 0 && (
+        <Card className="glass-card rounded-xl" style={{ borderColor: "rgba(34, 197, 94, 0.15)" }}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Leaf className="w-5 h-5 text-green-400" />
+              Human Signals
+              <Badge variant="outline" className="text-[10px] border-green-500/40 text-green-400">{humanIndicators.length} found</Badge>
+              <Hint text="Patterns commonly found in human-written reports that reduced the AI-detection score. These include contractions, terse/informal style, commit references, and advisory-style formatting." />
+            </CardTitle>
+            <CardDescription>Writing patterns that indicate human authorship</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {humanIndicators.map((item, i) => (
+              <div key={i} className="rounded-lg bg-green-500/5 border border-green-500/10 p-3 flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-mono border-green-500/40 text-green-400">
+                    {item.weight}
+                  </Badge>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-green-400/70">
+                    {EVIDENCE_TYPE_LABELS[item.type] || item.type}
+                  </span>
+                  <p className="text-sm leading-relaxed">{item.description}</p>
+                  {item.matched && (
+                    <span className="inline-block mt-1 text-xs font-mono text-green-400/70 bg-green-500/5 rounded px-1.5 py-0.5 truncate max-w-full">
+                      {item.matched}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

@@ -22,6 +22,13 @@ export interface EvidenceItem {
   matched?: string;
 }
 
+export interface HumanIndicatorItem {
+  type: string;
+  description: string;
+  weight: number;
+  matched?: string | null;
+}
+
 export const reportsTable = pgTable("reports", {
   id: serial("id").primaryKey(),
   deleteToken: varchar("delete_token", { length: 64 }).notNull().default(""),
@@ -46,6 +53,7 @@ export const reportsTable = pgTable("reports", {
   llmSlopScore: integer("llm_slop_score"),
   llmFeedback: jsonb("llm_feedback").$type<string[]>(),
   llmBreakdown: jsonb("llm_breakdown").$type<{ specificity: number; originality: number; voice: number; coherence: number; hallucination: number }>(),
+  humanIndicators: jsonb("human_indicators").$type<HumanIndicatorItem[]>().default([]),
   showInFeed: boolean("show_in_feed").notNull().default(false),
   fileName: varchar("file_name", { length: 255 }),
   fileSize: integer("file_size").notNull(),

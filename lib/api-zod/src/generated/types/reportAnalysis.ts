@@ -3,9 +3,10 @@
  * Do not edit manually.
  * Api
  * VulnRap.com API — Vulnerability Report Validation Platform
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 2.0.0
  */
 import type { EvidenceItem } from "./evidenceItem";
+import type { HumanIndicator } from "./humanIndicator";
 import type { RedactionSummary } from "./redactionSummary";
 import type { ReportAnalysisContentMode } from "./reportAnalysisContentMode";
 import type { ReportAnalysisLlmBreakdown } from "./reportAnalysisLlmBreakdown";
@@ -59,6 +60,8 @@ export interface ReportAnalysis {
    * @nullable
    */
   llmBreakdown?: ReportAnalysisLlmBreakdown;
+  /** Detected human-writing signals that reduced the slop score */
+  humanIndicators?: HumanIndicator[];
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * VulnRap.com API — Vulnerability Report Validation Platform
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 2.0.0
  */
 export interface HealthStatus {
   status: string;
@@ -108,6 +108,20 @@ export interface EvidenceItem {
   matched?: string | null;
 }
 
+export interface HumanIndicator {
+  /** Human indicator type (e.g. human_contractions, human_terse_style) */
+  type: string;
+  /** Human-readable description of the human signal */
+  description: string;
+  /** Negative weight (reduces slop score) */
+  weight: number;
+  /**
+   * The specific text that triggered this indicator
+   * @nullable
+   */
+  matched?: string | null;
+}
+
 export interface ReportAnalysis {
   id: number;
   /** Secret token for deleting this report. Only returned on initial submission. Store it — it cannot be recovered. */
@@ -153,6 +167,8 @@ export interface ReportAnalysis {
    * @nullable
    */
   llmBreakdown?: ReportAnalysisLlmBreakdown;
+  /** Detected human-writing signals that reduced the slop score */
+  humanIndicators?: HumanIndicator[];
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */
@@ -209,6 +225,8 @@ export interface CheckResult {
   llmFeedback?: string[] | null;
   /** @nullable */
   llmBreakdown?: CheckResultLlmBreakdown;
+  /** Detected human-writing signals that reduced the slop score */
+  humanIndicators?: HumanIndicator[];
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;

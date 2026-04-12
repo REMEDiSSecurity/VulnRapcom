@@ -523,6 +523,11 @@ components:
             hallucination:
               type: integer
           description: Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.
+        humanIndicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/HumanIndicator"
+          description: Detected human-writing signals that reduced the slop score
         llmEnhanced:
           type: boolean
           description: True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic.
@@ -645,6 +650,11 @@ components:
               type: integer
             hallucination:
               type: integer
+        humanIndicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/HumanIndicator"
+          description: Detected human-writing signals that reduced the slop score
         llmEnhanced:
           type: boolean
         previouslySubmitted:
@@ -914,6 +924,26 @@ components:
         - factual
         - template
         - quality
+
+    HumanIndicator:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Human indicator type (e.g. human_contractions, human_terse_style)
+        description:
+          type: string
+          description: Human-readable description of the human signal
+        weight:
+          type: integer
+          description: Negative weight (reduces slop score)
+        matched:
+          type: ["string", "null"]
+          description: The specific text that triggered this indicator
+      required:
+        - type
+        - description
+        - weight
 
     EvidenceItem:
       type: object
