@@ -631,7 +631,7 @@ export async function performActiveVerification(text: string): Promise<Verificat
       target: project.name,
       result: "skipped",
       detail: `Detected ${project.source.replace("_", " ")} "${project.name}" — GitHub verification not applicable`,
-      weight: -2,
+      weight: 0,
     });
   }
 
