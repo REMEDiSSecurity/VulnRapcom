@@ -5,6 +5,7 @@ import type { LLMSlopResult } from "./llm-slop";
 export interface ScoreBreakdown {
   linguistic: number;
   factual: number;
+  template: number;
   llm: number | null;
   quality: number;
 }
@@ -37,14 +38,16 @@ const DEFAULT_THRESHOLDS: TierThresholds = {
 };
 
 const BASE_WEIGHTS = {
-  linguistic: 0.30,
+  linguistic: 0.25,
   factual: 0.30,
-  llm: 0.40,
+  llm: 0.35,
+  template: 0.10,
 };
 
 const NO_LLM_WEIGHTS = {
-  linguistic: 0.50,
-  factual: 0.50,
+  linguistic: 0.25 + 0.35 * 0.4,
+  factual: 0.30 + 0.35 * 0.4,
+  template: 0.10 + 0.35 * 0.2,
 };
 
 export function loadThresholds(): TierThresholds {
@@ -102,6 +105,8 @@ export function fuseScores(
   const hasFutureCve = factual.evidence.some(e => e.type === "future_cve");
   const hasFakeAsan = factual.evidence.some(e => e.type === "fake_asan");
 
+  const templateScore = linguistic.templateScore;
+
   let rawScore: number;
 
   if (llm) {
@@ -109,49 +114,51 @@ export function fuseScores(
 
     if (hasHallucinatedFunction || hasFutureCve || hasFakeAsan) {
       weights = {
-        linguistic: 0.20,
+        linguistic: 0.15,
         factual: 0.50,
-        llm: 0.30,
+        llm: 0.25,
+        template: 0.10,
       };
     }
 
     rawScore =
-      linguistic.score * weights.linguistic +
+      linguistic.lexicalScore * (weights.linguistic * 0.6) +
+      linguistic.statisticalScore * (weights.linguistic * 0.4) +
       factual.score * weights.factual +
-      llm.llmSlopScore * weights.llm;
+      llm.llmSlopScore * weights.llm +
+      templateScore * weights.template;
   } else {
     let weights = { ...NO_LLM_WEIGHTS };
 
     if (hasHallucinatedFunction || hasFutureCve || hasFakeAsan) {
       weights = {
-        linguistic: 0.35,
-        factual: 0.65,
+        linguistic: 0.25,
+        factual: 0.55,
+        template: 0.20,
       };
     }
 
     rawScore =
-      linguistic.score * weights.linguistic +
-      factual.score * weights.factual;
+      linguistic.lexicalScore * (weights.linguistic * 0.6) +
+      linguistic.statisticalScore * (weights.linguistic * 0.4) +
+      factual.score * weights.factual +
+      templateScore * weights.template;
   }
 
-  const significantEvidence = allEvidence.filter(e => e.weight >= 5).length;
+  const evidenceCount = allEvidence.filter(e => e.weight >= 5).length;
   const confidence = Math.min(
     1.0,
-    0.2 + significantEvidence * 0.08 + (llm ? 0.25 : 0)
+    0.3 + evidenceCount * 0.07 + (llm ? 0.2 : 0)
   );
 
-  let slopScore: number;
-  if (confidence < 0.4) {
-    slopScore = Math.min(100, Math.max(0, Math.round(rawScore)));
-  } else {
-    slopScore = Math.min(100, Math.max(0, Math.round(
-      rawScore * confidence + rawScore * 0.5 * (1 - confidence)
-    )));
-  }
+  const slopScore = Math.min(100, Math.max(0, Math.round(
+    rawScore * confidence + 50 * (1 - confidence)
+  )));
 
   const breakdown: ScoreBreakdown = {
     linguistic: Math.round(linguistic.score),
     factual: Math.round(factual.score),
+    template: Math.round(templateScore),
     llm: llm ? Math.round(llm.llmSlopScore) : null,
     quality: Math.round(qualityScore),
   };

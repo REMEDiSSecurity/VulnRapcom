@@ -95,6 +95,9 @@ export const GetReportResponse = zod.object({
         .number()
         .describe("Linguistic AI fingerprinting score (0-100)"),
       factual: zod.number().describe("Factual verification score (0-100)"),
+      template: zod
+        .number()
+        .describe("Template\/mass-submission pattern score (0-100)"),
       llm: zod
         .number()
         .nullish()
@@ -344,6 +347,9 @@ export const CheckReportResponse = zod.object({
         .number()
         .describe("Linguistic AI fingerprinting score (0-100)"),
       factual: zod.number().describe("Factual verification score (0-100)"),
+      template: zod
+        .number()
+        .describe("Template\/mass-submission pattern score (0-100)"),
       llm: zod
         .number()
         .nullish()

@@ -11,6 +11,8 @@ export interface ScoreBreakdown {
   linguistic: number;
   /** Factual verification score (0-100) */
   factual: number;
+  /** Template/mass-submission pattern score (0-100) */
+  template: number;
   /**
    * LLM analysis score (0-100), null if LLM unavailable
    * @nullable

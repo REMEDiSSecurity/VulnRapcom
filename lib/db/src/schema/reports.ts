@@ -10,6 +10,7 @@ export interface RedactionSummary {
 export interface ScoreBreakdown {
   linguistic: number;
   factual: number;
+  template: number;
   llm: number | null;
   quality: number;
 }
@@ -35,7 +36,7 @@ export const reportsTable = pgTable("reports", {
   slopTier: varchar("slop_tier", { length: 30 }).notNull().default("Unknown"),
   qualityScore: integer("quality_score").notNull().default(50),
   confidence: real("confidence").notNull().default(0.5),
-  breakdown: jsonb("breakdown").$type<ScoreBreakdown>().default({ linguistic: 0, factual: 0, llm: null, quality: 50 }),
+  breakdown: jsonb("breakdown").$type<ScoreBreakdown>().default({ linguistic: 0, factual: 0, template: 0, llm: null, quality: 50 }),
   evidence: jsonb("evidence").$type<EvidenceItem[]>().default([]),
   similarityMatches: jsonb("similarity_matches").notNull().$type<SimilarityMatch[]>().default([]),
   sectionHashes: jsonb("section_hashes").$type<Record<string, string>>().default({}),
