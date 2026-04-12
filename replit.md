@@ -2,163 +2,85 @@
 
 ## Overview
 
-VulnRap.com — a vulnerability report validation platform (like VirusTotal for bug reports). Allows anonymous users to upload vulnerability reports to check for similarity with other reports and score them for potential AI-generated sloppiness using a two-layer scoring engine (deterministic heuristics + LLM semantic analysis via OpenAI-compatible API). Reports are auto-redacted before storage to remove PII, secrets, and identifying information.
+VulnRap.com is a vulnerability report validation platform designed to assess the quality and originality of bug reports. It functions similarly to VirusTotal but for vulnerability reports, allowing anonymous users to upload reports to check for similarity with existing reports and score them for potential AI-generated content. The platform employs a two-layer scoring engine combining deterministic heuristics and LLM semantic analysis. A core feature is the auto-redaction of reports before storage to remove sensitive information like PII, secrets, and identifying data. The project aims to provide a robust tool for bug bounty hunters, PSIRT teams, and VDPs to streamline vulnerability report processing and enhance validation.
 
-**Current version: 1.2.0** — PSIRT-focused LLM prompt, side-by-side similarity comparison, input hardening.
+## User Preferences
 
-## Recent Additions (post-1.2.0)
-- **Batch Upload** (`/batch`) — Multi-file drag-and-drop, sequential processing with progress, results links
-- **Compare Two Reports** (`/compare`) — Side-by-side dual text input, independent analysis via /check endpoint, section overlap detection
-- **Session History** (`/history`) — localStorage-based history of all submitted/checked reports, clear/remove entries
-- **Export/Download** — JSON and TXT export buttons on results page, generates downloadable analysis reports
-- **Configurable Thresholds** — Settings panel (localStorage) for custom slop score tiers and similarity thresholds, accessible from results page
-- **GitHub repo links** — All "open source" mentions link to https://github.com/REMEDiSSecurity/VulnRapcom, GitHub icon in footer
+I want iterative development.
+Ask before making major changes.
+Do not make changes to the folder `artifacts/vulnrap/src/assets`.
+Do not make changes to the file `artifacts/api-server/src/seed.ts`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/auto-form.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/auto-form-label.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/auto-form-object.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/multi-select.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/number-field.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/rating-group.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/rich-text-editor.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/tag-group.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/components/ui/date-field.tsx`.
+Do not make changes to the file `artifacts/vulnrap/src/lib/orval/client-fetch.ts`.
+Do not make changes to the file `artifacts/vulnrap/src/lib/orval/orval-plugin.ts`.
+Do not make changes to the file `artifacts/api-server/src/openapi.ts`.
+Do not make changes to the file `artifacts/api-server/src/db/migrations/meta/_journal.json`.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+## System Architecture
 
-## Stack
+The project is structured as a pnpm workspace monorepo utilizing Node.js 24 and TypeScript 5.9.
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Frontend**: React 19 + Vite 7 + Tailwind CSS 4 + React Router v7
-- **UI library**: Radix UI + shadcn/ui components
-- **Data fetching**: TanStack React Query + Orval-generated hooks
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (API server), Vite (frontend)
-- **Security**: helmet.js, express-rate-limit, multer (file uploads)
-- **Compression**: compression middleware on API server
-- **API docs**: swagger-ui-express served at `/api/docs`
+**Frontend (`artifacts/vulnrap/`)**:
+- Built with React 19, Vite 7, Tailwind CSS 4, and React Router v7.
+- UI/UX features a cyberpunk glassmorphism design system including glass cards, glow effects, gradient borders, and animated laser visuals.
+- Implements route-level code splitting for optimized loading.
+- Supports triple input methods: file upload (.txt, .md, 20MB max), direct text paste, and URL links (GitHub, Gist, GitLab, Pastebin).
+- Key pages include Home/submit, Results, Batch Upload, Compare, History, Verification, Stats, Developers (API docs), Use Cases, Blog, Security, Terms, and Privacy.
 
-## Architecture
+**Backend (`artifacts/api-server/`)**:
+- Uses Express 5 as the API framework.
+- Employs PostgreSQL with Drizzle ORM for data persistence.
+- Key modules include:
+    - **Auto-Redaction Engine**: Deterministic regex-based redaction of sensitive data (emails, IPs, API keys, etc.) before storage or analysis.
+    - **Section Parser**: Divides reports into logical sections, hashes them, and classifies their value for granular duplicate detection.
+    - **Similarity Engine**: Uses MinHash, Locality Sensitive Hashing (LSH), and Simhash for near-duplicate and structural similarity detection.
+    - **Multi-Axis Scoring Engine (v2.0)**: A four-axis system fused via Bayesian combination:
+        1.  **Linguistic AI Fingerprinting**: Detects AI-generated phrases, statistical text features, and template usage.
+        2.  **Quality vs Slop Separation**: Distinguishes between report quality (e.g., missing repro steps) and AI provenance signals.
+        3.  **Factual Verification**: Identifies fabricated evidence like inflated CVSS scores, placeholder URLs, or fake debug output.
+        4.  **LLM Semantic Analysis**: Evaluates reports across 5 dimensions (specificity, originality, voice, coherence, hallucination) using an OpenAI-compatible API.
+    - **Input Sanitization**: Strips harmful content like script tags, event handlers, and control characters from user inputs.
+- Supports two privacy modes: `full` (stores redacted text and hashes) and `similarity_only` (stores only hashes).
 
-### Frontend (`artifacts/vulnrap/`)
-- React + Vite app at root path "/"
-- Route-level code splitting with React.lazy() + Suspense for faster initial load
-- Cyberpunk glassmorphism design system: glass cards with backdrop blur, glow text effects, gradient borders (static + animated), colored icon glow backgrounds, cyber grid background, gradient histogram bars, colored stat accent borders, glass navbar/footer
-- Animated laser visual effects: background beams, ambient flashes, scan line (respects prefers-reduced-motion)
-- Custom AI-generated logo: synthetic bug inspected by lasers (`src/assets/logo.png`, compressed to ~355KB)
-- Pages:
-  - `/` — Home/submit with logo hero, 3 feature explainer cards, drag-and-drop upload, privacy mode selector, "How It Works" steps, hover hint tooltips
-  - `/results/:id` — Analysis results: slop score, auto-redaction summary, similarity matches, section-level analysis with per-section hashes, feedback, expandable redacted report view, verification badge with copy buttons, user feedback form (rating + helpful + suggestions)
-  - `/check` — Receiver flow: paste/upload a report for read-only analysis (no storage), shows slop score, duplicates, redaction analysis
-  - `/batch` — Batch upload: drag-and-drop multiple files, sequential processing with progress tracking, individual result links
-  - `/compare` — Two-report comparison: paste two reports side by side, independent analysis, section overlap detection
-  - `/history` — Session history: localStorage-based log of all analyses performed in this browser
-  - `/verify/:id` — Public verification page: lightweight badge view with slop score, match counts, content hash, submission date
-  - `/stats` — Platform statistics dashboard (metrics, distribution histogram, recent activity) — auto-refreshes every 30s, interactive stat cards with hover details
-  - `/developers` — API documentation: quick start guide, all endpoints with curl examples, Swagger UI link, integration ideas, example scripts (Python batch checker, Bash CI/CD gate, Node.js Slack bot)
-  - `/use-cases` — Real-world use cases for bug bounty hunters, PSIRT teams, platforms, CI/CD, researchers, and VDPs
-  - `/blog` — Blog with launch post explaining what VulnRap is, why it was built, and why nothing else like it exists
-  - `/security` — Responsible disclosure policy: how to report vulnerabilities, what to include, scope, timeline expectations
-  - `/terms` — Terms of service: funding model, user agreements, promises, disclaimers, content removal
-  - `/privacy` — Honest privacy policy: explains auto-redaction, what gets stored and compared, how comparison works, data lifecycle
-- Uses generated API hooks from `@workspace/api-client-react`
-- Triple input: file upload (.txt, .md, 20MB max), direct text paste, or URL link (GitHub, Gist, GitLab, Pastebin — HTTPS only, 5MB max, redirect-safe with per-hop allowlist validation)
-- Hover explainer tooltips on all key UI elements
-- Text paste field is plain text only -- no HTML rendering, no script execution, content auto-escaped by React JSX
+**API Endpoints**:
+- `POST /api/reports`: Submits a report for analysis.
+- `DELETE /api/reports/:id`: Deletes a report using a one-time token.
+- `POST /api/reports/check`: Performs read-only analysis without storage.
+- `GET /api/reports/:id`: Retrieves analysis results.
+- `GET /api/reports/:id/verify`: Provides lightweight verification data.
+- `GET /api/reports/:id/compare/:matchId`: Compares two reports side-by-side.
+- `GET /api/stats`, `/api/stats/recent`, `/api/stats/distribution`: Provides platform statistics.
+- `POST /api/feedback`: Submits user feedback.
+- `GET /api/docs`: Serves Swagger UI documentation.
 
-### Auto-Redaction Engine (`artifacts/api-server/src/lib/redactor.ts`)
-- Deterministic regex-based redaction (same input = same output)
-- Redacts: emails, IPs, API keys, JWTs, AWS keys, passwords, connection strings, private keys, phone numbers, SSNs, credit cards, UUIDs, internal hostnames/URLs, company names, usernames
-- Runs on every upload before analysis or storage
-- Returns redacted text + summary (counts by category)
+## External Dependencies
 
-### Section Parser (`artifacts/api-server/src/lib/section-parser.ts`)
-- Parses reports into logical sections (by markdown headers or paragraph breaks)
-- Hashes each section independently with SHA-256
-- Classifies sections by weight (high/medium/low value)
-- Finds exact section matches against existing reports for granular duplicate detection
-
-### Similarity Engine (`artifacts/api-server/src/lib/similarity.ts`)
-- MinHash + Locality Sensitive Hashing (LSH) for near-duplicate detection
-- Deterministic hash coefficients (SHA-256 seeded, stable across restarts)
-- Simhash for structural similarity
-- SHA-256 content hashing for exact-match deduplication
-- Combined scoring: returns top-N matches above threshold
-
-### Sloppiness Scoring (`artifacts/api-server/src/lib/sloppiness.ts`)
-- Heuristic-based scoring (0-100 scale)
-- Checks for: AI-generated phrases, missing version info, missing reproduction steps, missing code blocks, missing attack vector/impact, sentence length analysis, vocabulary diversity
-- Tiers: Probably Legit (0-14), Mildly Suspicious (15-29), Questionable (30-49), Highly Suspicious (50-69), Pure Slop (70-100)
-- Returns actionable feedback strings
-
-### LLM Semantic Analysis (`artifacts/api-server/src/lib/llm-slop.ts`)
-- PSIRT-focused LLM prompt evaluating 5 dimensions: technical specificity, PoC validity, target specificity, narrative credibility, template/mass-submission signals
-- Uses any OpenAI-compatible API (set OPENAI_API_KEY, optionally OPENAI_BASE_URL and OPENAI_MODEL)
-- Default model: gpt-4o-mini (configurable via OPENAI_MODEL env var)
-- 8000 char truncation limit for analysis context
-- Blended scoring: finalScore = heuristic * 0.4 + LLM * 0.6, clamped 0-100
-- Graceful fallback to heuristic-only when LLM unavailable/timeout (20s)
-
-### Input Sanitization (`artifacts/api-server/src/lib/sanitize.ts`)
-- Script/style tag stripping with placeholder markers
-- Event handler attribute removal (onclick, onerror, etc.)
-- JavaScript URI and data URI neutralization
-- Control character removal
-- Excessive whitespace/newline collapsing
-- Max input length guard (20MB)
-- Binary content detection for file uploads
-- Safe JSON parsing with prototype pollution protection
-- Filename sanitization (path traversal prevention, leading dot stripping)
-
-### Upload Pipeline
-1. User uploads .txt/.md file OR pastes text directly (plain text only, sanitized server-side)
-2. Auto-redaction engine scrubs PII/secrets from raw text
-3. All hashing (SHA-256, MinHash, Simhash, LSH, section hashes) runs on redacted text only
-4. Similarity comparison against existing redacted reports
-5. Section-level hash matching for granular duplicate detection
-6. Sloppiness analysis runs on original text (for accurate AI detection)
-7. Only redacted text is stored (never raw); in similarity_only mode, not even redacted text is stored
-
-### Privacy Modes
-- **full**: Stores redacted report text + all hashes/fingerprints
-- **similarity_only**: Stores only hashes/fingerprints, no text at all
-
-### Database Schema (`lib/db/src/schema/`)
-- `reports` table: id, delete_token, content_hash, simhash, minhash_signature, content_text (nullable), redacted_text (nullable), content_mode, slop_score, slop_tier, similarity_matches (jsonb), section_hashes (jsonb), section_matches (jsonb), redaction_summary (jsonb), feedback (jsonb), file_name, file_size, created_at
-- `report_hashes` table: indexed hash lookup (sha256, simhash per report)
-- `similarity_results` table: pairwise similarity scores
-- `report_stats` table: aggregate counters
-- `user_feedback` table: id, report_id (optional FK to reports), rating (1-5), helpful (boolean), comment (text), created_at
-
-### User Flows
-- **Submitters**: Upload/paste a report → get analysis results → copy verification badge (markdown or plain text) → share with bug bounty program
-- **Receivers**: Paste/upload an incoming report on `/check` → see slop score, duplicates, redaction analysis → nothing stored (read-only check)
-- **Verification**: Anyone with a verify link (`/verify/:id`) can independently confirm a report's slop score and uniqueness
-
-### API Endpoints
-- `POST /api/reports` — Submit a report for analysis (multipart: file upload or rawText field, 20MB limit). Returns a one-time delete token.
-- `DELETE /api/reports/:id` — Delete a report (requires delete token in body). Cascades to hashes, similarity records.
-- `POST /api/reports/check` — Check a report without storing (receiver flow, read-only analysis)
-- `GET /api/reports/:id` — Get report analysis results (includes redacted text, section hashes, redaction summary)
-- `GET /api/reports/:id/verify` — Lightweight verification badge data (slop score, match counts, verify URL)
-- `GET /api/reports/:id/compare/:matchId` — Side-by-side comparison of two reports (redacted text snippets, scores, section comparison map, content modes). Access-controlled: only returns data when reports have an existing similarity relationship.
-- `GET /api/reports/lookup/:hash` — Look up by SHA-256 hash
-- `GET /api/stats` — Platform-wide statistics
-- `GET /api/stats/recent` — Recent submission activity
-- `GET /api/stats/distribution` — Slop score distribution histogram
-- `POST /api/feedback` — Submit user feedback (rating 1-5, helpful boolean, optional comment)
-- `GET /api/healthz` — Health check
-- `GET /api/docs` — Swagger UI interactive API documentation
-
-### Seed Data
-- 6 realistic vulnerability reports seeded via `pnpm --filter @workspace/api-server run seed`
-- Includes: XSS, IDOR, SQLi, SSRF, race condition reports (legit) + 1 AI-generated slop report
-- Seed script at `artifacts/api-server/src/seed.ts`
-
-## Key Commands
-
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
-- `pnpm --filter @workspace/api-server run seed` — seed example vulnerability reports
-- `pnpm --filter @workspace/vulnrap run dev` — run frontend dev server
-
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+- **Node.js**: Runtime environment.
+- **pnpm**: Monorepo package manager.
+- **TypeScript**: Programming language.
+- **Express**: Backend web application framework.
+- **React**: Frontend library.
+- **Vite**: Frontend build tool.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **React Router**: Declarative routing for React.
+- **Radix UI + shadcn/ui**: UI component libraries.
+- **TanStack React Query**: Data fetching and caching.
+- **Orval**: API client code generation from OpenAPI specifications.
+- **PostgreSQL**: Relational database.
+- **Drizzle ORM**: TypeScript ORM for SQL databases.
+- **Zod**: Schema declaration and validation library.
+- **esbuild**: Build tool for API server.
+- **helmet.js**: Express middleware for security headers.
+- **express-rate-limit**: Rate limiting middleware for Express.
+- **multer**: Middleware for handling `multipart/form-data`.
+- **compression**: Compression middleware for Express.
+- **swagger-ui-express**: Serves Swagger UI for API documentation.
+- **OpenAI-compatible API**: Used by the LLM Semantic Analysis engine for AI-powered report evaluation.

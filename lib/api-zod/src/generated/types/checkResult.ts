@@ -5,31 +5,35 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 0.1.0
  */
+import type { CheckResultLlmBreakdown } from "./checkResultLlmBreakdown";
 import type { CheckResultSectionHashes } from "./checkResultSectionHashes";
+import type { EvidenceItem } from "./evidenceItem";
 import type { RedactionSummary } from "./redactionSummary";
+import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
 
 export interface CheckResult {
   slopScore: number;
   slopTier: string;
+  /** Report quality/completeness score 0-100 */
+  qualityScore?: number;
+  /** Confidence in the slopScore (0.0-1.0) */
+  confidence?: number;
+  breakdown?: ScoreBreakdown;
+  evidence?: EvidenceItem[];
   similarityMatches: SimilarityMatch[];
   sectionHashes: CheckResultSectionHashes;
   sectionMatches: SectionMatchItem[];
   redactionSummary: RedactionSummary;
-  /** Heuristic feedback strings — specific issues flagged by the rule-based engine */
+  /** Heuristic feedback strings */
   feedback: string[];
-  /**
-   * LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out.
-   * @nullable
-   */
+  /** @nullable */
   llmSlopScore?: number | null;
-  /**
-   * Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.
-   * @nullable
-   */
+  /** @nullable */
   llmFeedback?: string[] | null;
-  /** True when LLM analysis contributed to the final slopScore. */
+  /** @nullable */
+  llmBreakdown?: CheckResultLlmBreakdown;
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;

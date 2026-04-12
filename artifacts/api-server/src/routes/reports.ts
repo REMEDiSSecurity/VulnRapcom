@@ -20,13 +20,35 @@ import {
 } from "@workspace/api-zod";
 import { computeMinHash, computeSimhash, computeContentHash, computeLSHBuckets, findSimilarReports } from "../lib/similarity";
 import { analyzeSloppiness } from "../lib/sloppiness";
-import { analyzeSlopWithLLM, blendSlopScores, getSlopTier, isLLMAvailable } from "../lib/llm-slop";
+import { analyzeSlopWithLLM, isLLMAvailable } from "../lib/llm-slop";
+import { analyzeLinguistic } from "../lib/linguistic-analysis";
+import { analyzeFactual } from "../lib/factual-verification";
+import { fuseScores, type FusionResult } from "../lib/score-fusion";
 import { redactReport } from "../lib/redactor";
 import { parseSections, findSectionMatches } from "../lib/section-parser";
 import { sanitizeText, sanitizeFileName, detectBinaryContent } from "../lib/sanitize";
 import { extractTextFromPdf } from "../lib/pdf";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
+
+async function performAnalysis(originalText: string, redactedText: string): Promise<FusionResult & { llmResult: Awaited<ReturnType<typeof analyzeSlopWithLLM>> }> {
+  const [heuristic, linguistic, factual, llmResult] = await Promise.all([
+    Promise.resolve(analyzeSloppiness(originalText)),
+    Promise.resolve(analyzeLinguistic(originalText)),
+    Promise.resolve(analyzeFactual(originalText)),
+    analyzeSlopWithLLM(redactedText),
+  ]);
+
+  const fusion = fuseScores(linguistic, factual, llmResult, heuristic.qualityScore);
+
+  return {
+    ...fusion,
+    feedback: heuristic.feedback.length > 0
+      ? heuristic.feedback
+      : fusion.feedback,
+    llmResult,
+  };
+}
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const MAX_URL_SIZE = 5 * 1024 * 1024;
@@ -287,17 +309,8 @@ router.post("/reports", async (req, res): Promise<void> => {
     candidateReports as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
-  const [analysis, llmResult] = await Promise.all([
-    Promise.resolve(analyzeSloppiness(text)),
-    analyzeSlopWithLLM(redactedText),
-  ]);
-
-  const finalSlopScore = llmResult
-    ? blendSlopScores(analysis.score, llmResult.llmSlopScore)
-    : analysis.score;
-  const finalSlopTier = llmResult
-    ? getSlopTier(finalSlopScore)
-    : analysis.tier;
+  const analysisResult = await performAnalysis(text, redactedText);
+  const { llmResult } = analysisResult;
 
   const deleteToken = crypto.randomBytes(32).toString("hex");
 
@@ -313,15 +326,20 @@ router.post("/reports", async (req, res): Promise<void> => {
         contentText: contentMode === "full" ? analysisText : null,
         redactedText: contentMode === "full" ? analysisText : null,
         contentMode,
-        slopScore: finalSlopScore,
-        slopTier: finalSlopTier,
+        slopScore: analysisResult.slopScore,
+        slopTier: analysisResult.slopTier,
+        qualityScore: analysisResult.qualityScore,
+        confidence: analysisResult.confidence,
+        breakdown: analysisResult.breakdown,
+        evidence: analysisResult.evidence,
         similarityMatches,
         sectionHashes,
         sectionMatches,
         redactionSummary,
-        feedback: analysis.feedback,
+        feedback: analysisResult.feedback,
         llmSlopScore: llmResult ? llmResult.llmSlopScore : null,
         llmFeedback: llmResult ? llmResult.llmFeedback : null,
+        llmBreakdown: llmResult?.llmBreakdown ?? null,
         showInFeed,
         fileName: safeFileName,
         fileSize: rawFileSize,
@@ -372,6 +390,10 @@ router.post("/reports", async (req, res): Promise<void> => {
     contentMode: report.contentMode,
     slopScore: report.slopScore,
     slopTier: report.slopTier,
+    qualityScore: report.qualityScore,
+    confidence: report.confidence,
+    breakdown: report.breakdown ?? { linguistic: 0, factual: 0, llm: null, quality: 50 },
+    evidence: report.evidence ?? [],
     similarityMatches: report.similarityMatches,
     sectionHashes: report.sectionHashes ?? {},
     sectionMatches: report.sectionMatches ?? [],
@@ -380,6 +402,7 @@ router.post("/reports", async (req, res): Promise<void> => {
     feedback: report.feedback,
     llmSlopScore: report.llmSlopScore ?? null,
     llmFeedback: report.llmFeedback ?? null,
+    llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
     fileName: report.fileName,
     fileSize: report.fileSize,
@@ -488,35 +511,31 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     checkCandidates as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
-  const { redactedText: checkRedactedText } = { redactedText: analysisText };
-  const [[analysis, llmCheckResult], [existingReport]] = await Promise.all([
-    Promise.all([
-      Promise.resolve(analyzeSloppiness(text)),
-      analyzeSlopWithLLM(checkRedactedText),
-    ]),
+  const [analysisResult, [existingReport]] = await Promise.all([
+    performAnalysis(text, analysisText),
     db.select({ id: reportsTable.id })
       .from(reportsTable)
       .where(eq(reportsTable.contentHash, contentHash)),
   ]);
 
-  const checkFinalScore = llmCheckResult
-    ? blendSlopScores(analysis.score, llmCheckResult.llmSlopScore)
-    : analysis.score;
-  const checkFinalTier = llmCheckResult
-    ? getSlopTier(checkFinalScore)
-    : analysis.tier;
+  const { llmResult: checkLlmResult } = analysisResult;
 
   const response = CheckReportResponse.parse({
-    slopScore: checkFinalScore,
-    slopTier: checkFinalTier,
+    slopScore: analysisResult.slopScore,
+    slopTier: analysisResult.slopTier,
+    qualityScore: analysisResult.qualityScore,
+    confidence: analysisResult.confidence,
+    breakdown: analysisResult.breakdown,
+    evidence: analysisResult.evidence,
     similarityMatches,
     sectionHashes,
     sectionMatches,
     redactionSummary,
-    feedback: analysis.feedback,
-    llmSlopScore: llmCheckResult ? llmCheckResult.llmSlopScore : null,
-    llmFeedback: llmCheckResult ? llmCheckResult.llmFeedback : null,
-    llmEnhanced: llmCheckResult != null,
+    feedback: analysisResult.feedback,
+    llmSlopScore: checkLlmResult ? checkLlmResult.llmSlopScore : null,
+    llmFeedback: checkLlmResult ? checkLlmResult.llmFeedback : null,
+    llmBreakdown: checkLlmResult?.llmBreakdown ?? null,
+    llmEnhanced: checkLlmResult != null,
     previouslySubmitted: !!existingReport,
     existingReportId: existingReport?.id ?? null,
   });
@@ -771,6 +790,10 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     contentMode: report.contentMode,
     slopScore: report.slopScore,
     slopTier: report.slopTier,
+    qualityScore: report.qualityScore ?? 50,
+    confidence: report.confidence ?? 0.5,
+    breakdown: report.breakdown ?? { linguistic: 0, factual: 0, llm: null, quality: 50 },
+    evidence: report.evidence ?? [],
     similarityMatches: report.similarityMatches,
     sectionHashes: report.sectionHashes ?? {},
     sectionMatches: report.sectionMatches ?? [],
@@ -779,6 +802,7 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     feedback: report.feedback,
     llmSlopScore: report.llmSlopScore ?? null,
     llmFeedback: report.llmFeedback ?? null,
+    llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
     fileName: report.fileName,
     fileSize: report.fileSize,

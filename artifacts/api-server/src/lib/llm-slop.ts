@@ -4,9 +4,19 @@ import { logger } from "./logger";
 export interface LLMSlopResult {
   llmSlopScore: number;
   llmFeedback: string[];
+  llmBreakdown: LLMBreakdown | null;
+  llmRedFlags: string[];
 }
 
-const LLM_TIMEOUT_MS = 20_000;
+export interface LLMBreakdown {
+  specificity: number;
+  originality: number;
+  voice: number;
+  coherence: number;
+  hallucination: number;
+}
+
+const LLM_TIMEOUT_MS = 30_000;
 
 function buildClient(): OpenAI | null {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -24,66 +34,66 @@ export function isLLMAvailable(): boolean {
   return !!process.env.OPENAI_API_KEY;
 }
 
-const SYSTEM_PROMPT = `You are a PSIRT (Product Security Incident Response Team) triage analyst evaluating incoming vulnerability reports. Your job is to score how likely a report is AI-generated "slop" vs. genuine human security research — helping triage teams decide where to invest limited review time.
+const SYSTEM_PROMPT = `You are a PSIRT triage analyst scoring vulnerability reports for AI-generated "slop." Evaluate five dimensions and return structured JSON.
 
-Score the report from 0 to 100, where:
-- 0–14: Probably Legit — reads like genuine human research with verifiable details
-- 15–29: Mildly Suspicious — mostly credible but has minor AI-like patterns
-- 30–49: Questionable — noticeable AI-generation signals; needs closer triage review
-- 50–69: Highly Suspicious — multiple strong AI-generation indicators; likely wastes triage time
-- 70–100: Pure Slop — overwhelmingly AI-generated; safe to deprioritize
+## Scoring Dimensions (each 0-100, where 100 = most suspicious/AI-like)
 
-Evaluate these PSIRT-specific dimensions (semantic signals that regex cannot catch):
+1. **specificity** (weight 0.15): Are technical details concrete and verifiable? Score HIGH if vague placeholders ("the endpoint", "a recent version"), generic descriptions. Score LOW if exact versions, paths, parameters, error messages.
 
-1. **Technical specificity** — Are version numbers, endpoints, payloads, and system details concrete and internally consistent? Or are they vague placeholders (e.g., "the API endpoint", "a recent version")? Real researchers cite exact versions, paths, and parameters.
+2. **originality** (weight 0.25): Does this read like original research or template-stuffed AI output? Score HIGH if it follows rigid vulnerability template patterns, uses boilerplate remediation, could be copy-pasted to any target. Score LOW if observations are specific to this target, contain unique findings.
 
-2. **PoC validity** — Does the proof-of-concept actually demonstrate the claimed vulnerability class? A report claiming SQLi but showing only an XSS payload, or describing a generic attack without a working exploit, is a red flag. Check if reproduction steps would actually trigger the described behavior.
+3. **voice** (weight 0.20): Does the writing voice sound human? Score HIGH if overly formal, no contractions, uniform sentence length, AI buzzwords ("delve", "paramount", "multifaceted", "comprehensive analysis"). Score LOW if natural/informal, variable sentence structure, domain-specific jargon used correctly.
 
-3. **Target specificity** — Could this report be copy-pasted against ANY application with minimal edits? Mass-submission slop uses templated language with slot-filled product names. Genuine reports contain observations specific to the target's actual behavior, error messages, or architecture.
+4. **coherence** (weight 0.15): Is the vulnerability description internally consistent? Score HIGH if the claimed vuln class doesn't match the evidence, PoC doesn't demonstrate the claim, or attack flow is idealized without real-world testing artifacts. Score LOW if claims match evidence, PoC is relevant.
 
-4. **Narrative credibility** — Does the report read like someone who actually tested this? Look for signs of real interaction: specific error messages encountered, unexpected behaviors observed, iterative discovery. AI slop tends to describe idealized attack flows without the messy reality of actual testing.
+5. **hallucination** (weight 0.25): Are there signs of fabricated technical details? Score HIGH if function names seem invented, CVE IDs look wrong, severity claims lack evidence, generic code snippets that wouldn't actually work. Score LOW if technical details appear real and verifiable.
 
-5. **Template & mass-submission signals** — Does the report follow a rigid template structure identical to known AI-generated vulnerability reports? Look for: identical section ordering across all vuln types, placeholder-like descriptions, claims of "critical" severity without supporting evidence, and boilerplate remediation advice copied verbatim from OWASP/CWE descriptions.
-
-Respond ONLY with a valid JSON object — no preamble, no markdown, no explanation outside the JSON:
+## Response Format
+Respond ONLY with valid JSON:
 {
-  "score": <integer 0-100>,
-  "observations": [
-    "<specific observation about THIS report>",
-    "<specific observation about THIS report>",
-    "<specific observation about THIS report>"
-  ]
+  "specificity": <0-100>,
+  "originality": <0-100>,
+  "voice": <0-100>,
+  "coherence": <0-100>,
+  "hallucination": <0-100>,
+  "red_flags": ["<specific red flag from THIS report>", ...],
+  "reasoning": "<2-3 sentence summary of your assessment>"
 }
 
 Rules:
-- observations array must have exactly 2–4 items
-- Each observation must be a concrete, actionable sentence referencing actual content from this report
-- Frame observations from a PSIRT triage perspective: "A triage analyst would notice..." or "This report [does/lacks]..."
-- Do not use generic statements. Reference actual phrases, sections, or details (or their absence) from the report.
-- Do not mention that you are an AI or that you are analyzing the report`;
+- red_flags: 0-4 items, each a concrete observation referencing actual content
+- reasoning: concise, references specific parts of the report
+- Do not mention that you are an AI`;
 
 export async function analyzeSlopWithLLM(
   text: string
 ): Promise<LLMSlopResult | null> {
   const client = buildClient();
-  if (!client) return null;
+  if (!client) {
+    logger.info("LLM slop: no API key configured, skipping LLM analysis");
+    return null;
+  }
 
   const truncatedText =
-    text.length > 8000 ? text.slice(0, 8000) + "\n\n[truncated for analysis]" : text;
+    text.length > 4000 ? text.slice(0, 4000) + "\n\n[truncated for analysis]" : text;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
   try {
+    const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+    logger.info({ model, textLength: truncatedText.length }, "LLM slop: sending request");
+
     const response = await client.chat.completions.create(
       {
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        max_completion_tokens: 512,
+        model,
+        temperature: 0.1,
+        max_completion_tokens: 600,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: `You are triaging this incoming vulnerability report. Score it for AI-generated slop:\n\n---\n${truncatedText}\n---`,
+            content: `Score this vulnerability report for AI-generated slop:\n\n---\n${truncatedText}\n---`,
           },
         ],
       },
@@ -91,31 +101,96 @@ export async function analyzeSlopWithLLM(
     );
 
     const raw = response.choices[0]?.message?.content?.trim() ?? "";
+    logger.info({ rawLength: raw.length }, "LLM slop: received response");
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      logger.warn("LLM slop: no JSON found in response");
+      logger.warn({ raw: raw.slice(0, 200) }, "LLM slop: no JSON found in response");
       return null;
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as {
-      score: number;
-      observations: string[];
+      specificity?: number;
+      originality?: number;
+      voice?: number;
+      coherence?: number;
+      hallucination?: number;
+      red_flags?: string[];
+      reasoning?: string;
+      score?: number;
+      observations?: string[];
     };
 
-    const score = Math.min(100, Math.max(0, Math.round(Number(parsed.score))));
-    const observations = Array.isArray(parsed.observations)
-      ? parsed.observations
-          .filter((o) => typeof o === "string" && o.trim().length > 0)
-          .slice(0, 4)
-      : [];
+    const hasNewFormat = parsed.specificity !== undefined ||
+      parsed.originality !== undefined ||
+      parsed.voice !== undefined;
 
-    if (observations.length === 0) {
-      logger.warn("LLM slop: empty observations");
+    let breakdown: LLMBreakdown;
+    let weightedScore: number;
+
+    if (hasNewFormat) {
+      breakdown = {
+        specificity: clamp(parsed.specificity ?? 50),
+        originality: clamp(parsed.originality ?? 50),
+        voice: clamp(parsed.voice ?? 50),
+        coherence: clamp(parsed.coherence ?? 50),
+        hallucination: clamp(parsed.hallucination ?? 50),
+      };
+
+      weightedScore = Math.round(
+        breakdown.specificity * 0.15 +
+        breakdown.originality * 0.25 +
+        breakdown.voice * 0.20 +
+        breakdown.coherence * 0.15 +
+        breakdown.hallucination * 0.25
+      );
+    } else if (typeof parsed.score === "number") {
+      const legacyScore = clamp(parsed.score);
+      breakdown = {
+        specificity: legacyScore,
+        originality: legacyScore,
+        voice: legacyScore,
+        coherence: legacyScore,
+        hallucination: legacyScore,
+      };
+      weightedScore = legacyScore;
+      logger.info({ legacyScore }, "LLM slop: used legacy score format");
+    } else {
+      logger.warn("LLM slop: response missing both new and legacy fields");
       return null;
     }
 
-    return { llmSlopScore: score, llmFeedback: observations };
+    const redFlags = Array.isArray(parsed.red_flags)
+      ? parsed.red_flags.filter((f): f is string => typeof f === "string" && f.trim().length > 0).slice(0, 4)
+      : [];
+
+    const feedback: string[] = [];
+    if (typeof parsed.reasoning === "string" && parsed.reasoning.trim().length > 0) {
+      feedback.push(parsed.reasoning.trim());
+    }
+    if (Array.isArray(parsed.observations)) {
+      for (const obs of parsed.observations) {
+        if (typeof obs === "string" && obs.trim().length > 0) {
+          feedback.push(obs.trim());
+        }
+      }
+    }
+    for (const flag of redFlags) {
+      feedback.push(flag);
+    }
+
+    if (feedback.length === 0) {
+      feedback.push(`LLM analysis complete: weighted score ${weightedScore}/100`);
+    }
+
+    logger.info({ weightedScore, breakdown }, "LLM slop: analysis complete");
+
+    return {
+      llmSlopScore: clamp(weightedScore),
+      llmFeedback: feedback,
+      llmBreakdown: breakdown,
+      llmRedFlags: redFlags,
+    };
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") {
       logger.warn("LLM slop: timed out");
@@ -126,6 +201,10 @@ export async function analyzeSlopWithLLM(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function clamp(val: number): number {
+  return Math.min(100, Math.max(0, Math.round(Number(val) || 0)));
 }
 
 export function blendSlopScores(

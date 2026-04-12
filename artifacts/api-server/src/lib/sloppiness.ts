@@ -1,5 +1,8 @@
 interface SlopAnalysis {
   score: number;
+  qualityScore: number;
+  slopSignals: string[];
+  qualityFeedback: string[];
   feedback: string[];
   tier: string;
 }
@@ -52,24 +55,25 @@ const STRUCTURE_PATTERNS = {
 };
 
 export function analyzeSloppiness(text: string): SlopAnalysis {
-  const feedback: string[] = [];
-  let penaltyPoints = 0;
-  const maxPoints = 100;
+  const slopSignals: string[] = [];
+  const qualityFeedback: string[] = [];
+  let slopPoints = 0;
+  let qualityPenalty = 0;
 
   const lowerText = text.toLowerCase();
   const wordCount = text.split(/\s+/).length;
 
   if (wordCount < 30) {
-    penaltyPoints += 25;
-    feedback.push("Report is extremely short — less than 30 words. Meaningful vulnerability reports need detail.");
+    qualityPenalty += 25;
+    qualityFeedback.push("Report is extremely short — less than 30 words. Meaningful vulnerability reports need detail.");
   } else if (wordCount < 100) {
-    penaltyPoints += 10;
-    feedback.push("Report is quite short. Consider adding more technical detail.");
+    qualityPenalty += 10;
+    qualityFeedback.push("Report is quite short. Consider adding more technical detail.");
   }
 
   if (wordCount > 5000) {
-    penaltyPoints += 10;
-    feedback.push("Report is unusually long. AI-generated reports tend to be verbose — concise reports with evidence are more credible.");
+    slopPoints += 10;
+    slopSignals.push("Report is unusually long. AI-generated reports tend to be verbose — concise reports with evidence are more credible.");
   }
 
   let aiPhraseCount = 0;
@@ -82,91 +86,101 @@ export function analyzeSloppiness(text: string): SlopAnalysis {
   }
 
   if (aiPhraseCount >= 5) {
-    penaltyPoints += 30;
-    feedback.push(`Contains ${aiPhraseCount} common AI-generated phrases. This strongly suggests automated generation.`);
+    slopPoints += 30;
+    slopSignals.push(`Contains ${aiPhraseCount} common AI-generated phrases. This strongly suggests automated generation.`);
   } else if (aiPhraseCount >= 3) {
-    penaltyPoints += 15;
-    feedback.push(`Contains ${aiPhraseCount} phrases commonly seen in AI-generated text: "${foundPhrases.slice(0, 3).join('", "')}".`);
+    slopPoints += 15;
+    slopSignals.push(`Contains ${aiPhraseCount} phrases commonly seen in AI-generated text: "${foundPhrases.slice(0, 3).join('", "')}".`);
   } else if (aiPhraseCount >= 1) {
-    penaltyPoints += 5;
-    feedback.push(`Contains phrasing occasionally seen in AI output: "${foundPhrases[0]}".`);
+    slopPoints += 5;
+    slopSignals.push(`Contains phrasing occasionally seen in AI output: "${foundPhrases[0]}".`);
   }
 
   if (!STRUCTURE_PATTERNS.hasVersion.test(text)) {
-    penaltyPoints += 8;
-    feedback.push("Missing specific software version. Reports without version info cannot be triaged effectively.");
+    qualityPenalty += 8;
+    qualityFeedback.push("Missing specific software version. Reports without version info cannot be triaged effectively.");
   }
 
   if (!STRUCTURE_PATTERNS.hasComponent.test(text) && !STRUCTURE_PATTERNS.hasSpecificPath.test(text)) {
-    penaltyPoints += 8;
-    feedback.push("Missing affected component or file path. Specify the exact module, function, or endpoint.");
+    qualityPenalty += 8;
+    qualityFeedback.push("Missing affected component or file path. Specify the exact module, function, or endpoint.");
   }
 
   if (!STRUCTURE_PATTERNS.hasReproSteps.test(text)) {
-    penaltyPoints += 10;
-    feedback.push("No reproduction steps found. Include step-by-step instructions to recreate the issue.");
+    qualityPenalty += 10;
+    qualityFeedback.push("No reproduction steps found. Include step-by-step instructions to recreate the issue.");
   }
 
   if (!STRUCTURE_PATTERNS.hasCodeBlock.test(text)) {
-    penaltyPoints += 5;
-    feedback.push("No code blocks or inline code detected. Include PoC code, commands, or payloads.");
+    qualityPenalty += 5;
+    qualityFeedback.push("No code blocks or inline code detected. Include PoC code, commands, or payloads.");
   }
 
   if (!STRUCTURE_PATTERNS.hasAttackVector.test(text)) {
-    penaltyPoints += 5;
-    feedback.push("Missing attack vector classification (network, local, etc.) or CVE/CWE reference.");
+    qualityPenalty += 5;
+    qualityFeedback.push("Missing attack vector classification (network, local, etc.) or CVE/CWE reference.");
   }
 
   if (!STRUCTURE_PATTERNS.hasImpact.test(text)) {
-    penaltyPoints += 5;
-    feedback.push("Missing impact assessment. Describe the severity and consequences of exploitation.");
+    qualityPenalty += 5;
+    qualityFeedback.push("Missing impact assessment. Describe the severity and consequences of exploitation.");
   }
 
   if (!STRUCTURE_PATTERNS.hasExpectedBehavior.test(text) && !STRUCTURE_PATTERNS.hasObservedBehavior.test(text)) {
-    penaltyPoints += 5;
-    feedback.push("Missing expected vs. observed behavior comparison.");
+    qualityPenalty += 5;
+    qualityFeedback.push("Missing expected vs. observed behavior comparison.");
   }
 
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
   if (sentences.length > 5) {
     const avgLength = sentences.reduce((sum, s) => sum + s.trim().split(/\s+/).length, 0) / sentences.length;
     if (avgLength > 30) {
-      penaltyPoints += 8;
-      feedback.push("Sentences are unusually long on average — characteristic of AI-generated prose. Real reports tend to be terse and technical.");
+      slopPoints += 8;
+      slopSignals.push("Sentences are unusually long on average — characteristic of AI-generated prose. Real reports tend to be terse and technical.");
     }
   }
 
   const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
   if (paragraphs.length === 1 && wordCount > 200) {
-    penaltyPoints += 5;
-    feedback.push("Single wall of text — consider structuring with headers, lists, or paragraphs.");
+    qualityPenalty += 5;
+    qualityFeedback.push("Single wall of text — consider structuring with headers, lists, or paragraphs.");
   }
 
   const uniqueWords = new Set(lowerText.split(/\s+/));
   const uniqueRatio = uniqueWords.size / Math.max(wordCount, 1);
   if (uniqueRatio < 0.3 && wordCount > 100) {
-    penaltyPoints += 10;
-    feedback.push("Very repetitive language detected — low vocabulary diversity.");
+    slopPoints += 10;
+    slopSignals.push("Very repetitive language detected — low vocabulary diversity.");
   }
 
-  const score = Math.min(maxPoints, Math.max(0, penaltyPoints));
+  const slopScore = Math.min(100, Math.max(0, slopPoints));
+  const qualityScore = Math.min(100, Math.max(0, 100 - qualityPenalty));
+
+  const allFeedback = [...slopSignals, ...qualityFeedback];
 
   let tier: string;
-  if (score >= 70) {
+  if (slopScore >= 70) {
     tier = "Pure Slop";
-  } else if (score >= 50) {
+  } else if (slopScore >= 50) {
     tier = "Highly Suspicious";
-  } else if (score >= 30) {
+  } else if (slopScore >= 30) {
     tier = "Questionable";
-  } else if (score >= 15) {
+  } else if (slopScore >= 15) {
     tier = "Mildly Suspicious";
   } else {
     tier = "Probably Legit";
   }
 
-  if (feedback.length === 0) {
-    feedback.push("Report appears well-structured with specific technical details. Nice work.");
+  if (allFeedback.length === 0) {
+    allFeedback.push("Report appears well-structured with specific technical details. Nice work.");
   }
 
-  return { score, feedback, tier };
+  return {
+    score: slopScore,
+    qualityScore,
+    slopSignals,
+    qualityFeedback,
+    feedback: allFeedback,
+    tier,
+  };
 }

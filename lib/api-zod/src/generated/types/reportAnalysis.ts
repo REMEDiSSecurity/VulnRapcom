@@ -5,9 +5,12 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 0.1.0
  */
+import type { EvidenceItem } from "./evidenceItem";
 import type { RedactionSummary } from "./redactionSummary";
 import type { ReportAnalysisContentMode } from "./reportAnalysisContentMode";
+import type { ReportAnalysisLlmBreakdown } from "./reportAnalysisLlmBreakdown";
 import type { ReportAnalysisSectionHashes } from "./reportAnalysisSectionHashes";
+import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
 
@@ -17,10 +20,17 @@ export interface ReportAnalysis {
   deleteToken?: string;
   contentHash: string;
   contentMode: ReportAnalysisContentMode;
-  /** Sloppiness score 0-100 (higher = more suspicious) */
+  /** AI slop likelihood score 0-100 (higher = more likely AI-generated) */
   slopScore: number;
   /** Human-readable sloppiness tier */
   slopTier: string;
+  /** Report quality/completeness score 0-100 (higher = better quality). Separate from slopScore — a terse real report can have low quality but also low slop. */
+  qualityScore?: number;
+  /** Confidence in the slopScore (0.0-1.0). Low confidence means limited signals were available. */
+  confidence?: number;
+  breakdown?: ScoreBreakdown;
+  /** Specific signals found during analysis with their weights */
+  evidence?: EvidenceItem[];
   similarityMatches: SimilarityMatch[];
   /** SHA-256 hashes of each report section for granular similarity */
   sectionHashes: ReportAnalysisSectionHashes;
@@ -35,15 +45,20 @@ export interface ReportAnalysis {
   /** Heuristic feedback strings — specific issues flagged by the rule-based engine */
   feedback: string[];
   /**
-   * LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out. When present, the final slopScore is a weighted blend (40% heuristic + 60% LLM).
+   * LLM analysis slop score (0–100), weighted from 5 dimensions (specificity, originality, voice, coherence, hallucination). Null when LLM is unavailable. Contributes to the fused slopScore via multi-axis Bayesian combination.
    * @nullable
    */
   llmSlopScore?: number | null;
   /**
-   * Semantic observations from the LLM scorer — covers technical specificity, coherence, genericity, and narrative credibility. Null when LLM analysis is unavailable.
+   * Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.
    * @nullable
    */
   llmFeedback?: string[] | null;
+  /**
+   * Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.
+   * @nullable
+   */
+  llmBreakdown?: ReportAnalysisLlmBreakdown;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */

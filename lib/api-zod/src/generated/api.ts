@@ -73,8 +73,59 @@ export const GetReportResponse = zod.object({
   contentMode: zod.enum(["full", "similarity_only"]),
   slopScore: zod
     .number()
-    .describe("Sloppiness score 0-100 (higher = more suspicious)"),
+    .describe(
+      "AI slop likelihood score 0-100 (higher = more likely AI-generated)",
+    ),
   slopTier: zod.string().describe("Human-readable sloppiness tier"),
+  qualityScore: zod
+    .number()
+    .optional()
+    .describe(
+      "Report quality\/completeness score 0-100 (higher = better quality). Separate from slopScore — a terse real report can have low quality but also low slop.",
+    ),
+  confidence: zod
+    .number()
+    .optional()
+    .describe(
+      "Confidence in the slopScore (0.0-1.0). Low confidence means limited signals were available.",
+    ),
+  breakdown: zod
+    .object({
+      linguistic: zod
+        .number()
+        .describe("Linguistic AI fingerprinting score (0-100)"),
+      factual: zod.number().describe("Factual verification score (0-100)"),
+      llm: zod
+        .number()
+        .nullish()
+        .describe("LLM analysis score (0-100), null if LLM unavailable"),
+      quality: zod.number().describe("Report quality score (0-100)"),
+    })
+    .optional(),
+  evidence: zod
+    .array(
+      zod.object({
+        type: zod
+          .string()
+          .describe(
+            "Evidence type identifier (e.g. ai_phrase, placeholder_url, severity_inflation)",
+          ),
+        description: zod
+          .string()
+          .describe("Human-readable description of the signal"),
+        weight: zod
+          .number()
+          .describe(
+            "Weight\/importance of this signal (higher = more significant)",
+          ),
+        matched: zod
+          .string()
+          .nullish()
+          .describe("The specific text or pattern that was matched"),
+      }),
+    )
+    .optional()
+    .describe("Specific signals found during analysis with their weights"),
   similarityMatches: zod.array(
     zod.object({
       reportId: zod.number(),
@@ -117,13 +168,25 @@ export const GetReportResponse = zod.object({
     .number()
     .nullish()
     .describe(
-      "LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out. When present, the final slopScore is a weighted blend (40% heuristic + 60% LLM).",
+      "LLM analysis slop score (0–100), weighted from 5 dimensions (specificity, originality, voice, coherence, hallucination). Null when LLM is unavailable. Contributes to the fused slopScore via multi-axis Bayesian combination.",
     ),
   llmFeedback: zod
     .array(zod.string())
     .nullish()
     .describe(
-      "Semantic observations from the LLM scorer — covers technical specificity, coherence, genericity, and narrative credibility. Null when LLM analysis is unavailable.",
+      "Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.",
+    ),
+  llmBreakdown: zod
+    .object({
+      specificity: zod.number().optional(),
+      originality: zod.number().optional(),
+      voice: zod.number().optional(),
+      coherence: zod.number().optional(),
+      hallucination: zod.number().optional(),
+    })
+    .nullish()
+    .describe(
+      "Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.",
     ),
   llmEnhanced: zod
     .boolean()
@@ -267,6 +330,50 @@ export const CheckReportBody = zod.object({
 export const CheckReportResponse = zod.object({
   slopScore: zod.number(),
   slopTier: zod.string(),
+  qualityScore: zod
+    .number()
+    .optional()
+    .describe("Report quality\/completeness score 0-100"),
+  confidence: zod
+    .number()
+    .optional()
+    .describe("Confidence in the slopScore (0.0-1.0)"),
+  breakdown: zod
+    .object({
+      linguistic: zod
+        .number()
+        .describe("Linguistic AI fingerprinting score (0-100)"),
+      factual: zod.number().describe("Factual verification score (0-100)"),
+      llm: zod
+        .number()
+        .nullish()
+        .describe("LLM analysis score (0-100), null if LLM unavailable"),
+      quality: zod.number().describe("Report quality score (0-100)"),
+    })
+    .optional(),
+  evidence: zod
+    .array(
+      zod.object({
+        type: zod
+          .string()
+          .describe(
+            "Evidence type identifier (e.g. ai_phrase, placeholder_url, severity_inflation)",
+          ),
+        description: zod
+          .string()
+          .describe("Human-readable description of the signal"),
+        weight: zod
+          .number()
+          .describe(
+            "Weight\/importance of this signal (higher = more significant)",
+          ),
+        matched: zod
+          .string()
+          .nullish()
+          .describe("The specific text or pattern that was matched"),
+      }),
+    )
+    .optional(),
   similarityMatches: zod.array(
     zod.object({
       reportId: zod.number(),
@@ -292,26 +399,19 @@ export const CheckReportResponse = zod.object({
     totalRedactions: zod.number(),
     categories: zod.record(zod.string(), zod.number()),
   }),
-  feedback: zod
-    .array(zod.string())
-    .describe(
-      "Heuristic feedback strings — specific issues flagged by the rule-based engine",
-    ),
-  llmSlopScore: zod
-    .number()
-    .nullish()
-    .describe(
-      "LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out.",
-    ),
-  llmFeedback: zod
-    .array(zod.string())
-    .nullish()
-    .describe(
-      "Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.",
-    ),
-  llmEnhanced: zod
-    .boolean()
-    .describe("True when LLM analysis contributed to the final slopScore."),
+  feedback: zod.array(zod.string()).describe("Heuristic feedback strings"),
+  llmSlopScore: zod.number().nullish(),
+  llmFeedback: zod.array(zod.string()).nullish(),
+  llmBreakdown: zod
+    .object({
+      specificity: zod.number().optional(),
+      originality: zod.number().optional(),
+      voice: zod.number().optional(),
+      coherence: zod.number().optional(),
+      hallucination: zod.number().optional(),
+    })
+    .nullish(),
+  llmEnhanced: zod.boolean(),
   previouslySubmitted: zod
     .boolean()
     .describe("Whether this exact report was found in the database"),

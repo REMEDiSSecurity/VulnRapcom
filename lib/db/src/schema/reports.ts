@@ -1,10 +1,24 @@
-import { pgTable, text, serial, integer, timestamp, jsonb, index, varchar, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb, index, varchar, boolean, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export interface RedactionSummary {
   totalRedactions: number;
   categories: Record<string, number>;
+}
+
+export interface ScoreBreakdown {
+  linguistic: number;
+  factual: number;
+  llm: number | null;
+  quality: number;
+}
+
+export interface EvidenceItem {
+  type: string;
+  description: string;
+  weight: number;
+  matched?: string;
 }
 
 export const reportsTable = pgTable("reports", {
@@ -19,6 +33,10 @@ export const reportsTable = pgTable("reports", {
   contentMode: varchar("content_mode", { length: 20 }).notNull().default("full"),
   slopScore: integer("slop_score").notNull().default(0),
   slopTier: varchar("slop_tier", { length: 30 }).notNull().default("Unknown"),
+  qualityScore: integer("quality_score").notNull().default(50),
+  confidence: real("confidence").notNull().default(0.5),
+  breakdown: jsonb("breakdown").$type<ScoreBreakdown>().default({ linguistic: 0, factual: 0, llm: null, quality: 50 }),
+  evidence: jsonb("evidence").$type<EvidenceItem[]>().default([]),
   similarityMatches: jsonb("similarity_matches").notNull().$type<SimilarityMatch[]>().default([]),
   sectionHashes: jsonb("section_hashes").$type<Record<string, string>>().default({}),
   sectionMatches: jsonb("section_matches").$type<SectionMatch[]>().default([]),
@@ -26,6 +44,7 @@ export const reportsTable = pgTable("reports", {
   feedback: jsonb("feedback").notNull().$type<string[]>().default([]),
   llmSlopScore: integer("llm_slop_score"),
   llmFeedback: jsonb("llm_feedback").$type<string[]>(),
+  llmBreakdown: jsonb("llm_breakdown").$type<{ specificity: number; originality: number; voice: number; coherence: number; hallucination: number }>(),
   showInFeed: boolean("show_in_feed").notNull().default(false),
   fileName: varchar("file_name", { length: 255 }),
   fileSize: integer("file_size").notNull(),

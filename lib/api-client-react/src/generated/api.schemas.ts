@@ -66,16 +66,63 @@ export const ReportAnalysisContentMode = {
  */
 export type ReportAnalysisSectionHashes = { [key: string]: string };
 
+/**
+ * Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.
+ * @nullable
+ */
+export type ReportAnalysisLlmBreakdown = {
+  specificity?: number;
+  originality?: number;
+  voice?: number;
+  coherence?: number;
+  hallucination?: number;
+} | null;
+
+export interface ScoreBreakdown {
+  /** Linguistic AI fingerprinting score (0-100) */
+  linguistic: number;
+  /** Factual verification score (0-100) */
+  factual: number;
+  /**
+   * LLM analysis score (0-100), null if LLM unavailable
+   * @nullable
+   */
+  llm?: number | null;
+  /** Report quality score (0-100) */
+  quality: number;
+}
+
+export interface EvidenceItem {
+  /** Evidence type identifier (e.g. ai_phrase, placeholder_url, severity_inflation) */
+  type: string;
+  /** Human-readable description of the signal */
+  description: string;
+  /** Weight/importance of this signal (higher = more significant) */
+  weight: number;
+  /**
+   * The specific text or pattern that was matched
+   * @nullable
+   */
+  matched?: string | null;
+}
+
 export interface ReportAnalysis {
   id: number;
   /** Secret token for deleting this report. Only returned on initial submission. Store it — it cannot be recovered. */
   deleteToken?: string;
   contentHash: string;
   contentMode: ReportAnalysisContentMode;
-  /** Sloppiness score 0-100 (higher = more suspicious) */
+  /** AI slop likelihood score 0-100 (higher = more likely AI-generated) */
   slopScore: number;
   /** Human-readable sloppiness tier */
   slopTier: string;
+  /** Report quality/completeness score 0-100 (higher = better quality). Separate from slopScore — a terse real report can have low quality but also low slop. */
+  qualityScore?: number;
+  /** Confidence in the slopScore (0.0-1.0). Low confidence means limited signals were available. */
+  confidence?: number;
+  breakdown?: ScoreBreakdown;
+  /** Specific signals found during analysis with their weights */
+  evidence?: EvidenceItem[];
   similarityMatches: SimilarityMatch[];
   /** SHA-256 hashes of each report section for granular similarity */
   sectionHashes: ReportAnalysisSectionHashes;
@@ -90,15 +137,20 @@ export interface ReportAnalysis {
   /** Heuristic feedback strings — specific issues flagged by the rule-based engine */
   feedback: string[];
   /**
-   * LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out. When present, the final slopScore is a weighted blend (40% heuristic + 60% LLM).
+   * LLM analysis slop score (0–100), weighted from 5 dimensions (specificity, originality, voice, coherence, hallucination). Null when LLM is unavailable. Contributes to the fused slopScore via multi-axis Bayesian combination.
    * @nullable
    */
   llmSlopScore?: number | null;
   /**
-   * Semantic observations from the LLM scorer — covers technical specificity, coherence, genericity, and narrative credibility. Null when LLM analysis is unavailable.
+   * Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.
    * @nullable
    */
   llmFeedback?: string[] | null;
+  /**
+   * Per-dimension LLM scores (0-100 each). Null when LLM analysis is unavailable.
+   * @nullable
+   */
+  llmBreakdown?: ReportAnalysisLlmBreakdown;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */
@@ -123,26 +175,38 @@ export interface VerificationBadge {
 
 export type CheckResultSectionHashes = { [key: string]: string };
 
+/**
+ * @nullable
+ */
+export type CheckResultLlmBreakdown = {
+  specificity?: number;
+  originality?: number;
+  voice?: number;
+  coherence?: number;
+  hallucination?: number;
+} | null;
+
 export interface CheckResult {
   slopScore: number;
   slopTier: string;
+  /** Report quality/completeness score 0-100 */
+  qualityScore?: number;
+  /** Confidence in the slopScore (0.0-1.0) */
+  confidence?: number;
+  breakdown?: ScoreBreakdown;
+  evidence?: EvidenceItem[];
   similarityMatches: SimilarityMatch[];
   sectionHashes: CheckResultSectionHashes;
   sectionMatches: SectionMatchItem[];
   redactionSummary: RedactionSummary;
-  /** Heuristic feedback strings — specific issues flagged by the rule-based engine */
+  /** Heuristic feedback strings */
   feedback: string[];
-  /**
-   * LLM-enhanced slop score (0–100). Null when LLM analysis is unavailable or timed out.
-   * @nullable
-   */
+  /** @nullable */
   llmSlopScore?: number | null;
-  /**
-   * Semantic observations from the LLM scorer. Null when LLM analysis is unavailable.
-   * @nullable
-   */
+  /** @nullable */
   llmFeedback?: string[] | null;
-  /** True when LLM analysis contributed to the final slopScore. */
+  /** @nullable */
+  llmBreakdown?: CheckResultLlmBreakdown;
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;
