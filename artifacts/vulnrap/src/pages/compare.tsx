@@ -1,13 +1,28 @@
-import { useState } from "react";
-import { GitCompare, Loader2, CheckCircle, AlertTriangle, Layers, Search, ShieldCheck, Lightbulb, HelpCircle, BarChart3, Gauge, AlertCircle } from "lucide-react";
+import { useState, useRef } from "react";
+import { GitCompare, Loader2, CheckCircle, AlertTriangle, Layers, Search, ShieldCheck, Lightbulb, HelpCircle, BarChart3, Gauge, AlertCircle, Database, ExternalLink } from "lucide-react";
 import { useCheckReport } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { getSettings, getSlopColorCustom, getSlopProgressColorCustom } from "@/lib/settings";
+import { anonymizeId } from "@/lib/utils";
+import { Link } from "react-router-dom";
+
+interface SimilarityMatch {
+  reportId: number;
+  similarity: number;
+  matchType: string;
+}
+
+interface SectionMatch {
+  sectionTitle: string;
+  matchedReportId: number;
+  matchedSectionTitle: string;
+  similarity: number;
+}
 
 interface CompareResult {
   slopScore: number;
@@ -20,7 +35,16 @@ interface CompareResult {
   redactionSummary: { totalRedactions: number; categories: Record<string, number> };
   sectionHashes: Record<string, string>;
   llmEnhanced?: boolean;
+  similarityMatches?: SimilarityMatch[];
+  sectionMatches?: SectionMatch[];
 }
+
+const MATCH_TYPE_LABELS: Record<string, string> = {
+  "near-duplicate": "Near Duplicate",
+  "high-similarity": "High Similarity",
+  structural: "Structural",
+  semantic: "Semantic",
+};
 
 function Hint({ text }: { text: string }) {
   return (
@@ -45,6 +69,12 @@ function getConfidenceColor(confidence: number): string {
   return "text-orange-400";
 }
 
+function getMatchColor(similarity: number): string {
+  if (similarity >= 80) return "text-destructive";
+  if (similarity >= 50) return "text-orange-400";
+  return "text-yellow-400";
+}
+
 function computeSectionOverlap(
   hashesA: Record<string, string>,
   hashesB: Record<string, string>
@@ -59,62 +89,240 @@ function computeSectionOverlap(
   return { identical, total: allKeys.size };
 }
 
+function ResultCard({ label, result, badge }: { label: string; result: CompareResult; badge?: React.ReactNode }) {
+  const settings = getSettings();
+  const slopColor = getSlopColorCustom(result.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+  const progressColor = getSlopProgressColorCustom(result.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
+  const bd = result.breakdown;
+
+  return (
+    <Card className="glass-card rounded-xl">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+          {label}
+          {badge ?? <Badge variant="outline" className="text-[10px]">Not stored</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-center">
+            <div className="text-[9px] text-muted-foreground uppercase">Slop</div>
+            <div className={`text-3xl font-bold font-mono ${slopColor} glow-text`}>
+              {result.slopScore}
+            </div>
+          </div>
+          {result.qualityScore != null && (
+            <>
+              <div className="h-10 w-px bg-border/30" />
+              <div className="flex flex-col items-center">
+                <div className="text-[9px] text-muted-foreground uppercase">Quality</div>
+                <div className={`text-3xl font-bold font-mono ${getQualityColor(result.qualityScore)}`}>
+                  {result.qualityScore}
+                </div>
+              </div>
+            </>
+          )}
+          <div className="flex-1 space-y-1 ml-2">
+            <div className="text-xs font-medium uppercase">{result.slopTier}</div>
+            <Progress value={result.slopScore} className="h-1.5" indicatorClassName={progressColor} />
+            {result.confidence != null && (
+              <div className="flex items-center gap-1 text-[10px]">
+                <Gauge className="w-3 h-3 text-muted-foreground" />
+                <span className={`font-mono ${getConfidenceColor(result.confidence)}`}>
+                  {(result.confidence * 100).toFixed(0)}% — {result.confidence >= 0.8 ? "High" : result.confidence >= 0.5 ? "Medium" : "Low"}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {bd && (
+          <>
+            <Separator className="bg-border/30" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <BarChart3 className="w-3 h-3 text-primary" />
+                Breakdown
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { label: "Ling", score: bd.linguistic ?? 0 },
+                  { label: "Fact", score: bd.factual ?? 0 },
+                  { label: "Tmpl", score: bd.template ?? 0 },
+                  { label: "LLM", score: bd.llm },
+                ].map(({ label: axLabel, score }) => (
+                  <div key={axLabel} className="flex items-center justify-between text-[10px]">
+                    <span className="text-muted-foreground">{axLabel}</span>
+                    {score != null ? (
+                      <span className={`font-mono font-bold ${(score as number) >= 50 ? "text-destructive" : (score as number) >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
+                    ) : (
+                      <span className="font-mono text-muted-foreground/50">N/A</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {result.evidence && result.evidence.length > 0 && (
+          <>
+            <Separator className="bg-border/30" />
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <AlertCircle className="w-3 h-3 text-primary" />
+              {result.evidence.length} evidence signal{result.evidence.length !== 1 ? "s" : ""}
+            </div>
+          </>
+        )}
+
+        {result.redactionSummary.totalRedactions > 0 && (
+          <>
+            <Separator className="bg-border/30" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
+              {result.redactionSummary.totalRedactions} items redacted
+            </div>
+          </>
+        )}
+
+        {result.feedback.length > 0 && (
+          <>
+            <Separator className="bg-border/30" />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Lightbulb className="w-3.5 h-3.5 text-primary" />
+                Feedback
+              </div>
+              <ul className="space-y-1">
+                {result.feedback.slice(0, 5).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs">
+                    <div className="mt-1.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+                {result.feedback.length > 5 && (
+                  <li className="text-xs text-muted-foreground pl-3">
+                    +{result.feedback.length - 5} more
+                  </li>
+                )}
+              </ul>
+            </div>
+          </>
+        )}
+
+        {Object.keys(result.sectionHashes).filter((k) => k !== "__full_document").length > 0 && (
+          <>
+            <Separator className="bg-border/30" />
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Layers className="w-3.5 h-3.5 text-primary" />
+              {Object.keys(result.sectionHashes).filter((k) => k !== "__full_document").length} sections parsed
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Compare() {
   const { toast } = useToast();
-  const settings = getSettings();
   const [textA, setTextA] = useState("");
   const [textB, setTextB] = useState("");
   const [resultA, setResultA] = useState<CompareResult | null>(null);
   const [resultB, setResultB] = useState<CompareResult | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [dbLookup, setDbLookup] = useState(false);
+  const [dbMatches, setDbMatches] = useState<SimilarityMatch[]>([]);
+  const [dbSectionMatches, setDbSectionMatches] = useState<SectionMatch[]>([]);
+  const [requestMode, setRequestMode] = useState<"manual" | "db">("manual");
+  const requestRef = useRef(0);
 
   const checkA = useCheckReport({
     mutation: {
-      onSuccess: (data) => setResultA(data as unknown as CompareResult),
-      onError: () => toast({ title: "Analysis failed", description: "Could not analyze Report A.", variant: "destructive" }),
+      onMutate: () => ({ rid: requestRef.current, mode: dbLookup ? "db" as const : "manual" as const }),
+      onSuccess: (data, _vars, context) => {
+        const ctx = context as { rid: number; mode: "manual" | "db" };
+        if (ctx.rid !== requestRef.current) return;
+        const r = data as unknown as CompareResult;
+        setResultA(r);
+        if (ctx.mode === "db") {
+          setDbMatches(r.similarityMatches ?? []);
+          setDbSectionMatches(r.sectionMatches ?? []);
+        }
+      },
+      onError: (_err, _vars, context) => {
+        const ctx = context as { rid: number };
+        if (ctx.rid !== requestRef.current) return;
+        toast({ title: "Analysis failed", description: "Could not analyze Report A.", variant: "destructive" });
+      },
     },
   });
 
   const checkB = useCheckReport({
     mutation: {
-      onSuccess: (data) => setResultB(data as unknown as CompareResult),
-      onError: () => toast({ title: "Analysis failed", description: "Could not analyze Report B.", variant: "destructive" }),
+      onMutate: () => ({ rid: requestRef.current }),
+      onSuccess: (data, _vars, context) => {
+        const ctx = context as { rid: number };
+        if (ctx.rid !== requestRef.current) return;
+        setResultB(data as unknown as CompareResult);
+      },
+      onError: (_err, _vars, context) => {
+        const ctx = context as { rid: number };
+        if (ctx.rid !== requestRef.current) return;
+        toast({ title: "Analysis failed", description: "Could not analyze Report B.", variant: "destructive" });
+      },
     },
   });
 
   const handleCompare = () => {
     const trimA = textA.trim();
-    const trimB = textB.trim();
-    if (!trimA || !trimB) {
-      toast({ title: "Missing content", description: "Please paste text in both panels.", variant: "destructive" });
+    if (!trimA) {
+      toast({ title: "Missing content", description: "Please paste text in Report A.", variant: "destructive" });
       return;
     }
+    if (!dbLookup) {
+      const trimB = textB.trim();
+      if (!trimB) {
+        toast({ title: "Missing content", description: "Please paste text in both panels.", variant: "destructive" });
+        return;
+      }
+    }
+    requestRef.current += 1;
+    const mode = dbLookup ? "db" as const : "manual" as const;
+    setRequestMode(mode);
     setResultA(null);
     setResultB(null);
-    setAnalyzing(true);
+    setDbMatches([]);
+    setDbSectionMatches([]);
     checkA.mutate({ data: { rawText: trimA } });
-    checkB.mutate({ data: { rawText: trimB } });
+    if (!dbLookup) {
+      checkB.mutate({ data: { rawText: textB.trim() } });
+    }
   };
 
-  const bothDone = resultA && resultB;
-  if (analyzing && bothDone) {
-    setAnalyzing(false);
-  }
-  const isPending = checkA.isPending || checkB.isPending;
+  const manualBothDone = requestMode === "manual" && resultA && resultB;
+  const dbDone = requestMode === "db" && resultA && !checkA.isPending;
 
-  const sectionOverlap = bothDone
+  const isPending = requestMode === "db" ? checkA.isPending : (checkA.isPending || checkB.isPending);
+
+  const sectionOverlap = manualBothDone
     ? computeSectionOverlap(resultA.sectionHashes, resultB.sectionHashes)
     : null;
+
+  const canCompare = dbLookup
+    ? !!textA.trim()
+    : (!!textA.trim() && !!textB.trim());
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
       <div className="space-y-2 pt-2 sm:pt-4">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary uppercase flex items-center gap-2 sm:gap-3 glow-text">
           <GitCompare className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />
-          Compare Two Reports
+          Compare Reports
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
-          Paste two vulnerability reports side by side. Both are analyzed independently and compared for section overlap. Nothing is stored.
+          {dbLookup
+            ? "Paste a report and search our database for the nearest similarity match. Nothing is stored."
+            : "Paste two vulnerability reports side by side. Both are analyzed independently and compared for section overlap. Nothing is stored."}
         </p>
         <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent mt-4" />
       </div>
@@ -122,12 +330,14 @@ export default function Compare() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="glass-card-accent rounded-xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Report A</CardTitle>
+            <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">
+              {dbLookup ? "Your Report" : "Report A"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <textarea
               className="w-full h-48 rounded-xl glass-card p-4 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/40 bg-transparent"
-              placeholder="Paste the first vulnerability report here..."
+              placeholder="Paste the vulnerability report here..."
               value={textA}
               onChange={(e) => setTextA(e.target.value)}
               spellCheck={false}
@@ -136,48 +346,212 @@ export default function Compare() {
             <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
               <span>{textA.length > 0 ? `${textA.length.toLocaleString()} chars` : ""}</span>
               {textA.length > 0 && (
-                <button type="button" className="hover:text-destructive transition-colors" onClick={() => { setTextA(""); setResultA(null); }}>Clear</button>
+                <button type="button" className="hover:text-destructive transition-colors" onClick={() => { setTextA(""); setResultA(null); setDbMatches([]); setDbSectionMatches([]); }}>Clear</button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="glass-card-accent rounded-xl">
+        <Card className={`glass-card-accent rounded-xl transition-all ${dbLookup ? "border-cyan-500/20" : ""}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground">Report B</CardTitle>
+            <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground flex items-center justify-between">
+              <span>{dbLookup ? "Database Match" : "Report B"}</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <textarea
-              className="w-full h-48 rounded-xl glass-card p-4 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/40 bg-transparent"
-              placeholder="Paste the second vulnerability report here..."
-              value={textB}
-              onChange={(e) => setTextB(e.target.value)}
-              spellCheck={false}
-              autoComplete="off"
-            />
-            <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
-              <span>{textB.length > 0 ? `${textB.length.toLocaleString()} chars` : ""}</span>
-              {textB.length > 0 && (
-                <button type="button" className="hover:text-destructive transition-colors" onClick={() => { setTextB(""); setResultB(null); }}>Clear</button>
-              )}
-            </div>
+            {dbLookup ? (
+              <div className="w-full h-48 rounded-xl glass-card p-4 flex flex-col items-center justify-center gap-3 text-center">
+                <div className="p-3 rounded-full bg-cyan-500/10">
+                  <Database className="w-8 h-8 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Database Similarity Search</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
+                    We'll compare your report against all stored reports using MinHash/LSH and find the closest matches.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  className="w-full h-48 rounded-xl glass-card p-4 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground/40 bg-transparent"
+                  placeholder="Paste the second vulnerability report here..."
+                  value={textB}
+                  onChange={(e) => setTextB(e.target.value)}
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                <div className="flex justify-between items-center text-xs text-muted-foreground mt-1">
+                  <span>{textB.length > 0 ? `${textB.length.toLocaleString()} chars` : ""}</span>
+                  {textB.length > 0 && (
+                    <button type="button" className="hover:text-destructive transition-colors" onClick={() => { setTextB(""); setResultB(null); }}>Clear</button>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 cursor-pointer select-none group">
+          <input
+            type="checkbox"
+            checked={dbLookup}
+            onChange={(e) => {
+              setDbLookup(e.target.checked);
+              setResultA(null);
+              setResultB(null);
+              setDbMatches([]);
+              setDbSectionMatches([]);
+            }}
+            className="w-4 h-4 rounded border-border bg-transparent accent-primary cursor-pointer"
+          />
+          <Database className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+            Find nearest match in database
+          </span>
+        </label>
       </div>
 
       <Button
         className="w-full h-11 sm:h-12 text-base sm:text-lg font-bold gap-2 glow-button"
         onClick={handleCompare}
-        disabled={!textA.trim() || !textB.trim() || isPending}
+        disabled={!canCompare || isPending}
       >
         {isPending ? (
-          <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing Both Reports...</>
+          <><Loader2 className="w-5 h-5 animate-spin" /> {dbLookup ? "Searching Database..." : "Analyzing Both Reports..."}</>
+        ) : dbLookup ? (
+          <><Search className="w-5 h-5" /> Search for Matches</>
         ) : (
           <><GitCompare className="w-5 h-5" /> Compare Reports</>
         )}
       </Button>
 
-      {bothDone && (
+      {dbDone && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+          {dbMatches.length > 0 ? (
+            <Card className="glass-card-accent rounded-xl border-cyan-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-cyan-400" />
+                  Similarity Matches Found
+                  <Badge variant="outline" className="border-cyan-500/40 text-cyan-400 text-[10px]">
+                    {dbMatches.length} match{dbMatches.length !== 1 ? "es" : ""}
+                  </Badge>
+                  <Hint text="These are reports in our database that share structural or content similarity with your submitted report, detected via MinHash/LSH and SimHash fingerprinting." />
+                </CardTitle>
+                <CardDescription>
+                  Reports in our database that are similar to yours, ranked by similarity score
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {dbMatches.map((match, i) => (
+                    <div key={i} className="rounded-lg glass-card p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Link
+                            to={`/verify/${match.reportId}`}
+                            className="font-mono text-sm text-primary hover:underline glow-text-sm inline-flex items-center gap-1"
+                          >
+                            {anonymizeId(match.reportId)}
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                          <Badge variant="outline" className="text-[10px]">
+                            {MATCH_TYPE_LABELS[match.matchType] ?? match.matchType}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-lg font-bold font-mono ${getMatchColor(match.similarity)}`}>
+                            {Math.round(match.similarity)}%
+                          </span>
+                        </div>
+                      </div>
+                      <Progress
+                        value={match.similarity}
+                        className="h-2"
+                        indicatorClassName={match.similarity >= 80 ? "bg-destructive" : match.similarity >= 50 ? "bg-orange-500" : "bg-yellow-500"}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="glass-card-accent rounded-xl border-green-500/20">
+              <CardContent className="py-8">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="p-3 rounded-full icon-glow-green">
+                    <CheckCircle className="w-8 h-8 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">No Similar Reports Found</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      This report doesn't match anything in our database. It appears to be unique.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {dbSectionMatches.length > 0 && (
+            <Card className="glass-card rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-primary" />
+                  Section-Level Matches
+                  <Badge variant="outline" className="text-[10px]">{dbSectionMatches.length}</Badge>
+                  <Hint text="Individual sections of your report that match sections in existing database reports. High similarity indicates copied or templated sections." />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {dbSectionMatches.map((sm, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs gap-2 rounded-lg glass-card p-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-medium truncate">{sm.sectionTitle}</span>
+                        <span className="text-muted-foreground shrink-0">→</span>
+                        <Link to={`/verify/${sm.matchedReportId}`} className="text-primary hover:underline font-mono shrink-0">
+                          {anonymizeId(sm.matchedReportId)}
+                        </Link>
+                        <span className="text-muted-foreground truncate">({sm.matchedSectionTitle})</span>
+                      </div>
+                      <span className={`font-mono font-bold shrink-0 ${getMatchColor(sm.similarity)}`}>
+                        {Math.round(sm.similarity)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <ResultCard label="Your Report" result={resultA} />
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="outline"
+              className="gap-2 glass-card hover:border-primary/30"
+              onClick={() => {
+                setTextA("");
+                setResultA(null);
+                setDbMatches([]);
+                setDbSectionMatches([]);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <Search className="w-4 h-4" />
+              Search Again
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {manualBothDone && (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
           {sectionOverlap && sectionOverlap.total > 0 && (
             <Card className="glass-card-accent rounded-xl border-primary/20">
@@ -218,141 +592,8 @@ export default function Compare() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { label: "Report A", result: resultA },
-              { label: "Report B", result: resultB },
-            ].map(({ label, result }) => {
-              const slopColor = getSlopColorCustom(result!.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
-              const progressColor = getSlopProgressColorCustom(result!.slopScore, settings.slopThresholdLow, settings.slopThresholdHigh);
-              const bd = result!.breakdown;
-              return (
-                <Card key={label} className="glass-card rounded-xl">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                      {label}
-                      <Badge variant="outline" className="text-[10px]">Not stored</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="text-[9px] text-muted-foreground uppercase">Slop</div>
-                        <div className={`text-3xl font-bold font-mono ${slopColor} glow-text`}>
-                          {result!.slopScore}
-                        </div>
-                      </div>
-                      {result!.qualityScore != null && (
-                        <>
-                          <div className="h-10 w-px bg-border/30" />
-                          <div className="flex flex-col items-center">
-                            <div className="text-[9px] text-muted-foreground uppercase">Quality</div>
-                            <div className={`text-3xl font-bold font-mono ${getQualityColor(result!.qualityScore)}`}>
-                              {result!.qualityScore}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                      <div className="flex-1 space-y-1 ml-2">
-                        <div className="text-xs font-medium uppercase">{result!.slopTier}</div>
-                        <Progress value={result!.slopScore} className="h-1.5" indicatorClassName={progressColor} />
-                        {result!.confidence != null && (
-                          <div className="flex items-center gap-1 text-[10px]">
-                            <Gauge className="w-3 h-3 text-muted-foreground" />
-                            <span className={`font-mono ${getConfidenceColor(result!.confidence)}`}>
-                              {(result!.confidence * 100).toFixed(0)}% — {result!.confidence >= 0.8 ? "High" : result!.confidence >= 0.5 ? "Medium" : "Low"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {bd && (
-                      <>
-                        <Separator className="bg-border/30" />
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <BarChart3 className="w-3 h-3 text-primary" />
-                            Breakdown
-                          </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                            {[
-                              { label: "Ling", score: bd.linguistic ?? 0 },
-                              { label: "Fact", score: bd.factual ?? 0 },
-                              { label: "Tmpl", score: bd.template ?? 0 },
-                              { label: "LLM", score: bd.llm },
-                            ].map(({ label, score }) => (
-                              <div key={label} className="flex items-center justify-between text-[10px]">
-                                <span className="text-muted-foreground">{label}</span>
-                                {score != null ? (
-                                  <span className={`font-mono font-bold ${(score as number) >= 50 ? "text-destructive" : (score as number) >= 25 ? "text-yellow-500" : "text-green-500"}`}>{score}</span>
-                                ) : (
-                                  <span className="font-mono text-muted-foreground/50">N/A</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {result!.evidence && result!.evidence.length > 0 && (
-                      <>
-                        <Separator className="bg-border/30" />
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <AlertCircle className="w-3 h-3 text-primary" />
-                          {result!.evidence.length} evidence signal{result!.evidence.length !== 1 ? "s" : ""}
-                        </div>
-                      </>
-                    )}
-
-                    {result!.redactionSummary.totalRedactions > 0 && (
-                      <>
-                        <Separator className="bg-border/30" />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
-                          {result!.redactionSummary.totalRedactions} items redacted
-                        </div>
-                      </>
-                    )}
-
-                    {result!.feedback.length > 0 && (
-                      <>
-                        <Separator className="bg-border/30" />
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Lightbulb className="w-3.5 h-3.5 text-primary" />
-                            Feedback
-                          </div>
-                          <ul className="space-y-1">
-                            {result!.feedback.slice(0, 5).map((item, i) => (
-                              <li key={i} className="flex items-start gap-2 text-xs">
-                                <div className="mt-1.5 w-1 h-1 rounded-full bg-primary flex-shrink-0" />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                            {result!.feedback.length > 5 && (
-                              <li className="text-xs text-muted-foreground pl-3">
-                                +{result!.feedback.length - 5} more
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      </>
-                    )}
-
-                    {Object.keys(result!.sectionHashes).filter((k) => k !== "__full_document").length > 0 && (
-                      <>
-                        <Separator className="bg-border/30" />
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Layers className="w-3.5 h-3.5 text-primary" />
-                          {Object.keys(result!.sectionHashes).filter((k) => k !== "__full_document").length} sections parsed
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+            <ResultCard label="Report A" result={resultA} />
+            <ResultCard label="Report B" result={resultB} />
           </div>
 
           <div className="flex justify-center pt-2">
