@@ -10,4 +10,6 @@ import type { ReporterFeedbackItemTone } from "./reporterFeedbackItemTone";
 export interface ReporterFeedbackItem {
   tone: ReporterFeedbackItemTone;
   message: string;
+  /** @nullable */
+  priority?: number | null;
 }

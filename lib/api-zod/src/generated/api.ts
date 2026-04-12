@@ -408,6 +408,13 @@ export const GetReportResponse = zod.object({
                   order: zod.number(),
                   instruction: zod.string(),
                   note: zod.string().nullish(),
+                  source: zod
+                    .union([
+                      zod.literal("heuristic"),
+                      zod.literal("llm"),
+                      zod.literal(null),
+                    ])
+                    .nullish(),
                 }),
               ),
               environment: zod.array(zod.string()),
@@ -422,6 +429,14 @@ export const GetReportResponse = zod.object({
             severity: zod.enum(["critical", "important", "minor"]),
             description: zod.string(),
             suggestion: zod.string(),
+            audience: zod
+              .union([
+                zod.literal("triager"),
+                zod.literal("reporter"),
+                zod.literal("both"),
+                zod.literal(null),
+              ])
+              .nullish(),
           }),
         ),
         dontMiss: zod.array(
@@ -435,6 +450,7 @@ export const GetReportResponse = zod.object({
           zod.object({
             tone: zod.enum(["positive", "neutral", "concern"]),
             message: zod.string(),
+            priority: zod.number().nullish(),
           }),
         ),
         llmTriageGuidance: zod
@@ -894,6 +910,13 @@ export const CheckReportResponse = zod.object({
                   order: zod.number(),
                   instruction: zod.string(),
                   note: zod.string().nullish(),
+                  source: zod
+                    .union([
+                      zod.literal("heuristic"),
+                      zod.literal("llm"),
+                      zod.literal(null),
+                    ])
+                    .nullish(),
                 }),
               ),
               environment: zod.array(zod.string()),
@@ -908,6 +931,14 @@ export const CheckReportResponse = zod.object({
             severity: zod.enum(["critical", "important", "minor"]),
             description: zod.string(),
             suggestion: zod.string(),
+            audience: zod
+              .union([
+                zod.literal("triager"),
+                zod.literal("reporter"),
+                zod.literal("both"),
+                zod.literal(null),
+              ])
+              .nullish(),
           }),
         ),
         dontMiss: zod.array(
@@ -921,6 +952,7 @@ export const CheckReportResponse = zod.object({
           zod.object({
             tone: zod.enum(["positive", "neutral", "concern"]),
             message: zod.string(),
+            priority: zod.number().nullish(),
           }),
         ),
         llmTriageGuidance: zod

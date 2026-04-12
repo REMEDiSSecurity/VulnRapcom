@@ -5,10 +5,13 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 2.0.0
  */
+import type { ReproStepSource } from "./reproStepSource";
 
 export interface ReproStep {
   order: number;
   instruction: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  source?: ReproStepSource;
 }

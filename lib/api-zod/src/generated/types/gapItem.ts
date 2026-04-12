@@ -5,6 +5,7 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 2.0.0
  */
+import type { GapItemAudience } from "./gapItemAudience";
 import type { GapItemSeverity } from "./gapItemSeverity";
 
 export interface GapItem {
@@ -12,4 +13,6 @@ export interface GapItem {
   severity: GapItemSeverity;
   description: string;
   suggestion: string;
+  /** @nullable */
+  audience?: GapItemAudience;
 }

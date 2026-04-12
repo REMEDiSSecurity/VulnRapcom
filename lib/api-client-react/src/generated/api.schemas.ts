@@ -271,11 +271,25 @@ export interface TriageRecommendation {
   revision?: RevisionResult | null;
 }
 
+/**
+ * @nullable
+ */
+export type ReproStepSource =
+  | (typeof ReproStepSource)[keyof typeof ReproStepSource]
+  | null;
+
+export const ReproStepSource = {
+  heuristic: "heuristic",
+  llm: "llm",
+} as const;
+
 export interface ReproStep {
   order: number;
   instruction: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  source?: ReproStepSource;
 }
 
 export interface ReproGuidance {
@@ -295,11 +309,26 @@ export const GapItemSeverity = {
   minor: "minor",
 } as const;
 
+/**
+ * @nullable
+ */
+export type GapItemAudience =
+  | (typeof GapItemAudience)[keyof typeof GapItemAudience]
+  | null;
+
+export const GapItemAudience = {
+  triager: "triager",
+  reporter: "reporter",
+  both: "both",
+} as const;
+
 export interface GapItem {
   category: string;
   severity: GapItemSeverity;
   description: string;
   suggestion: string;
+  /** @nullable */
+  audience?: GapItemAudience;
 }
 
 export interface DontMissItem {
@@ -320,6 +349,8 @@ export const ReporterFeedbackItemTone = {
 export interface ReporterFeedbackItem {
   tone: ReporterFeedbackItemTone;
   message: string;
+  /** @nullable */
+  priority?: number | null;
 }
 
 export interface LLMTriageGuidance {

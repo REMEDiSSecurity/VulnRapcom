@@ -6,6 +6,7 @@ export interface ReproStep {
   order: number;
   instruction: string;
   note?: string;
+  source?: "heuristic" | "llm";
 }
 
 export interface ReproGuidance {
@@ -21,6 +22,7 @@ export interface GapItem {
   severity: "critical" | "important" | "minor";
   description: string;
   suggestion: string;
+  audience?: "triager" | "reporter" | "both";
 }
 
 export interface DontMissItem {
@@ -32,6 +34,7 @@ export interface DontMissItem {
 export interface ReporterFeedbackItem {
   tone: "positive" | "neutral" | "concern";
   message: string;
+  priority?: number;
 }
 
 export interface TriageAssistantResult {
@@ -398,7 +401,6 @@ export function analyzeGaps(
   }
 
   const hasCvss = /\bCVSS\b/i.test(text);
-  const hasCwe = /\bCWE-\d+\b/i.test(text);
   if (lower.includes("critical") || lower.includes("high severity")) {
     if (!hasCvss) {
       gaps.push({
@@ -406,6 +408,56 @@ export function analyzeGaps(
         severity: "minor",
         description: "High severity claimed but no CVSS vector or score provided",
         suggestion: "Request a CVSS 3.1 vector string to validate the severity claim",
+        audience: "reporter",
+      });
+    }
+  }
+
+  const hasAuthContext = /\b(?:auth(?:enticated|orization)?|login|session|token|cookie|credential|role|permission|admin|user\s*level|privilege)\b/i.test(text);
+  const authRelated = /\b(?:auth|session|JWT|token|IDOR|privilege|admin|access\s*control)\b/i.test(text);
+  if (authRelated && !hasAuthContext) {
+    gaps.push({
+      category: "missing_auth_context",
+      severity: "important",
+      description: "Auth-related vulnerability described without specifying authentication requirements or user roles",
+      suggestion: "Ask: what authentication state is required? What role/privilege level does the attacker need? Is it pre-auth or post-auth?",
+      audience: "both",
+    });
+  }
+
+  const hasNetworkPosition = /\b(?:internal\s*network|internet[- ]facing|local\s*network|adjacent|remote|external|DMZ|VPN|firewall|NAT)\b/i.test(text);
+  const networkRelevant = /\b(?:SSRF|internal|service|port|listen|bind|network|server)\b/i.test(text);
+  if (networkRelevant && !hasNetworkPosition) {
+    gaps.push({
+      category: "missing_network_position",
+      severity: "minor",
+      description: "No attacker network position specified (remote vs. adjacent vs. local)",
+      suggestion: "Clarify where the attacker must be positioned: internet-facing endpoint, internal network, or localhost only?",
+      audience: "triager",
+    });
+  }
+
+  const hasDependencyMention = /\b(?:dependenc(?:y|ies)|package|library|module|npm|pip|maven|gem|nuget|cargo|go\s*mod)\b/i.test(text);
+  const hasSourceFiles = /\b(?:\.(?:js|ts|py|rb|java|go|rs|c|cpp|php|cs)\b|src\/|lib\/|app\/|controllers?\/|models?\/|views?\/)\b/i.test(text);
+  if (hasDependencyMention && !hasVersionInfo) {
+    gaps.push({
+      category: "missing_dependency_version",
+      severity: "important",
+      description: "Dependencies mentioned but no specific versions provided",
+      suggestion: "Request exact dependency versions (from lock file) to determine if the vulnerable version is actually in use",
+      audience: "reporter",
+    });
+  }
+
+  if (hasSourceFiles) {
+    const hasLineRef = /\b(?:line\s*\d+|L\d+|:\d+)\b/.test(text);
+    if (!hasLineRef) {
+      gaps.push({
+        category: "missing_source_location",
+        severity: "minor",
+        description: "Source files referenced without specific line numbers or function names",
+        suggestion: "Request exact file paths with line numbers and the specific vulnerable function/method for faster validation",
+        audience: "reporter",
       });
     }
   }
@@ -481,7 +533,6 @@ export function analyzeDontMiss(
     });
   }
 
-  const hasNightTimestamp = /\b(?:0[0-4]:[0-5]\d(?::\d{2})?\s*(?:UTC|GMT))\b/i.test(text);
   const fabricatedEvidence = evidence.filter(e =>
     e.type === "fake_asan" || e.type === "fake_registers" || e.type === "repeating_stack"
   );
@@ -490,6 +541,32 @@ export function analyzeDontMiss(
       area: "Fabricated Debug Output",
       warning: "Debug output (ASan, stack traces, register dumps) appears fabricated",
       reason: "AI-generated reports sometimes include plausible-looking but fake debug output. Compare against what the actual tool/sanitizer would produce for this class of bug.",
+    });
+  }
+
+  const hasDependencyRef = /\b(?:dependenc(?:y|ies)|package|library|module|npm|pip|maven|gem|nuget|require|import)\b/i.test(text);
+  items.push({
+    area: "Dependency Tree",
+    warning: "Always check the dependency tree — transitive dependencies may be the actual attack surface",
+    reason: "Vulnerability reports often cite a top-level package but the actual vulnerable code lives in a nested dependency. Run dependency audit tools and check if the vulnerable component is actually reachable in your deployment.",
+  });
+
+  const hasSourceRef = /\b(?:\.(?:js|ts|py|rb|java|go|rs|c|cpp|php|cs)\b|src\/|lib\/|app\/|function\s+\w+|class\s+\w+|def\s+\w+)\b/i.test(text);
+  if (hasSourceRef) {
+    items.push({
+      area: "Source File Verification",
+      warning: "Source files and functions are referenced — verify they exist at the claimed paths and versions",
+      reason: "AI-generated reports frequently cite plausible but non-existent file paths and function names. Cross-reference every file path and function name against your actual codebase at the reported version before investing reproduction time.",
+    });
+  }
+
+  const endpointRef = /\b(?:\/api\/|endpoint|route|URL|path|GET\s+\/|POST\s+\/|PUT\s+\/|DELETE\s+\/)\b/i.test(text);
+  const vulnClassDetected = /\b(?:XSS|SQL|injection|SSRF|traversal|deserialization|overflow|bypass|race)\b/i.test(text);
+  if (endpointRef && vulnClassDetected) {
+    items.push({
+      area: "Endpoint Validation",
+      warning: "A real vulnerability class is referenced at a specific endpoint — verify the endpoint actually handles the claimed input type",
+      reason: "Even if the vulnerability class is valid, confirm the referenced endpoint accepts the described input format and reaches the vulnerable code path. A valid XSS class at a non-existent endpoint is still a false report.",
     });
   }
 
@@ -505,24 +582,60 @@ export function generateReporterFeedback(
 ): ReporterFeedbackItem[] {
   const feedback: ReporterFeedbackItem[] = [];
 
+  const hasCodeBlocks = /```[\s\S]*?```/.test(text);
+  const hasSteps = /\b(?:step\s*\d|steps?\s*to\s*reproduce)\b/i.test(text);
+  const hasVersions = /\b\d+\.\d+\.\d+\b/.test(text);
+  const hasToolOutput = /\b(?:curl|burp|zap|nmap|nikto|sqlmap|nuclei)\b/i.test(text);
+  const strengths: string[] = [];
+  if (hasCodeBlocks) strengths.push("includes code/PoC samples");
+  if (hasSteps) strengths.push("provides reproduction steps");
+  if (hasVersions) strengths.push("specifies software versions");
+  if (hasToolOutput) strengths.push("references actual security tools");
+
+  if (strengths.length > 0) {
+    feedback.push({
+      tone: "positive",
+      message: `Report strengths: ${strengths.join(", ")}. ${strengths.length >= 3 ? "This is a well-structured report." : ""}`,
+      priority: 1,
+    });
+  }
+
   if (slopScore <= 20 && confidence >= 0.7) {
     feedback.push({
       tone: "positive",
       message: "This report shows strong indicators of genuine research. The writing style, technical detail level, and verified references are consistent with hands-on security testing.",
+      priority: 2,
     });
   } else if (slopScore >= 70) {
     feedback.push({
       tone: "concern",
       message: "This report has significant AI-generation indicators. If requesting revisions, ask the reporter to provide environment-specific details, exact reproduction steps from their own testing, and raw tool output rather than summarized findings.",
+      priority: 1,
+    });
+  } else if (slopScore >= 50) {
+    feedback.push({
+      tone: "concern",
+      message: "Moderate AI-generation signals detected. The report may contain a mix of genuine findings and AI-polished content. Focus verification efforts on the technical claims rather than the writing style.",
+      priority: 2,
     });
   }
 
   const criticalGaps = gaps.filter(g => g.severity === "critical");
+  const importantGaps = gaps.filter(g => g.severity === "important");
   if (criticalGaps.length > 0) {
     const gapNames = criticalGaps.map(g => g.category.replace(/_/g, " ")).join(", ");
     feedback.push({
+      tone: "concern",
+      message: `Priority improvements needed: ${gapNames}. Send a structured follow-up requesting these specific items before investing time in reproduction.`,
+      priority: 1,
+    });
+  }
+  if (importantGaps.length > 0 && criticalGaps.length === 0) {
+    const gapNames = importantGaps.map(g => g.category.replace(/_/g, " ")).join(", ");
+    feedback.push({
       tone: "neutral",
-      message: `Key information gaps detected: ${gapNames}. Consider sending a structured follow-up requesting these specific items before investing time in reproduction.`,
+      message: `Suggested improvements: ${gapNames}. These would strengthen the report but aren't blocking for initial triage.`,
+      priority: 3,
     });
   }
 
@@ -533,11 +646,13 @@ export function generateReporterFeedback(
       feedback.push({
         tone: "positive",
         message: `${verifiedCount} technical references were independently verified. The reporter appears to have tested against real code/infrastructure.`,
+        priority: 2,
       });
     } else if (notFoundCount >= 2 && verifiedCount === 0) {
       feedback.push({
         tone: "concern",
         message: `${notFoundCount} referenced items could not be found in live sources. Consider asking the reporter to double-check their references before proceeding.`,
+        priority: 1,
       });
     }
   }
@@ -547,6 +662,7 @@ export function generateReporterFeedback(
     feedback.push({
       tone: "neutral",
       message: "Report uses formal/template-style opening language common in mass-submitted reports. This alone isn't conclusive but combined with other signals may indicate automated submission.",
+      priority: 4,
     });
   }
 
@@ -554,10 +670,59 @@ export function generateReporterFeedback(
     feedback.push({
       tone: "neutral",
       message: "No strong positive or negative indicators about reporter behavior. Proceed with standard triage workflow.",
+      priority: 5,
     });
   }
 
-  return feedback;
+  return feedback.sort((a, b) => (a.priority ?? 5) - (b.priority ?? 5));
+}
+
+function mergeReproGuidance(
+  heuristic: ReproGuidance | null,
+  llmGuidance: LLMTriageGuidance | null,
+): ReproGuidance | null {
+  if (!heuristic && !llmGuidance?.reproSteps?.length) return null;
+
+  if (heuristic && llmGuidance?.reproSteps?.length) {
+    const heuristicSteps: ReproStep[] = heuristic.steps.map(s => ({ ...s, source: "heuristic" as const }));
+    const llmSteps: ReproStep[] = llmGuidance.reproSteps.map((instruction, i) => ({
+      order: heuristicSteps.length + i + 1,
+      instruction,
+      source: "llm" as const,
+      note: "AI-suggested",
+    }));
+    const existingInstructions = new Set(heuristicSteps.map(s => s.instruction.toLowerCase().trim()));
+    const uniqueLlmSteps = llmSteps.filter(s => !existingInstructions.has(s.instruction.toLowerCase().trim()));
+
+    const mergedSteps = [...heuristicSteps, ...uniqueLlmSteps].map((s, i) => ({ ...s, order: i + 1 }));
+
+    return {
+      ...heuristic,
+      steps: mergedSteps,
+    };
+  }
+
+  if (heuristic) {
+    return {
+      ...heuristic,
+      steps: heuristic.steps.map(s => ({ ...s, source: "heuristic" as const })),
+    };
+  }
+
+  const llmSteps: ReproStep[] = llmGuidance!.reproSteps.map((instruction, i) => ({
+    order: i + 1,
+    instruction,
+    source: "llm" as const,
+    note: "AI-suggested",
+  }));
+
+  return {
+    vulnClass: "Unknown (AI-detected steps)",
+    confidence: 0.5,
+    steps: llmSteps,
+    environment: [],
+    tools: [],
+  };
 }
 
 export function generateTriageAssistant(
@@ -568,7 +733,8 @@ export function generateTriageAssistant(
   verification: VerificationResult | null,
   llmTriageGuidance: LLMTriageGuidance | null,
 ): TriageAssistantResult {
-  const reproGuidance = generateReproGuidance(text);
+  const rawRepro = generateReproGuidance(text);
+  const reproGuidance = mergeReproGuidance(rawRepro, llmTriageGuidance);
   const gaps = analyzeGaps(text, evidence, verification, slopScore);
   const dontMiss = analyzeDontMiss(text, evidence, verification, slopScore);
   const reporterFeedback = generateReporterFeedback(text, slopScore, confidence, gaps, verification);

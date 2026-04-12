@@ -360,7 +360,7 @@ function TriageAssistantPanel({ assistant, toast }: { assistant: TriageAssistant
   const [expanded, setExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<AssistantTab>("reproduce");
 
-  const hasRepro = !!assistant.reproGuidance || (assistant.llmTriageGuidance?.reproSteps?.length ?? 0) > 0;
+  const hasRepro = !!assistant.reproGuidance;
   const hasGaps = assistant.gaps.length > 0 || (assistant.llmTriageGuidance?.missingInfo?.length ?? 0) > 0;
   const hasDontMiss = assistant.dontMiss.length > 0 || (assistant.llmTriageGuidance?.dontMiss?.length ?? 0) > 0;
   const hasFeedback = assistant.reporterFeedback.length > 0 || !!assistant.llmTriageGuidance?.reporterFeedback;
@@ -471,12 +471,15 @@ function TriageAssistantPanel({ assistant, toast }: { assistant: TriageAssistant
                   </div>
                   <div className="space-y-2">
                     {assistant.reproGuidance.steps.map((step) => (
-                      <div key={step.order} className="flex items-start gap-3 glass-card rounded-lg p-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-400">
+                      <div key={step.order} className={`flex items-start gap-3 rounded-lg p-3 ${step.source === "llm" ? "border border-cyan-500/15 bg-cyan-500/5" : "glass-card"}`}>
+                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${step.source === "llm" ? "bg-cyan-500/10 border border-cyan-500/30 text-cyan-400" : "bg-indigo-500/10 border border-indigo-500/30 text-indigo-400"}`}>
                           {step.order}
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm leading-relaxed">{step.instruction}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm leading-relaxed flex-1">{step.instruction}</p>
+                            {step.source === "llm" && <Brain className="w-3 h-3 text-cyan-400 flex-shrink-0" />}
+                          </div>
                           {step.note && <p className="text-[10px] text-muted-foreground mt-1 italic">{step.note}</p>}
                         </div>
                       </div>
@@ -502,23 +505,7 @@ function TriageAssistantPanel({ assistant, toast }: { assistant: TriageAssistant
                   </div>
                 </div>
               )}
-              {assistant.llmTriageGuidance && assistant.llmTriageGuidance.reproSteps.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Brain className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className="text-xs font-bold text-cyan-400">AI-Suggested Steps</span>
-                  </div>
-                  {assistant.llmTriageGuidance.reproSteps.map((step, i) => (
-                    <div key={i} className="flex items-start gap-3 rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3">
-                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xs font-bold text-cyan-400">
-                        {i + 1}
-                      </div>
-                      <p className="text-sm leading-relaxed">{step}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!assistant.reproGuidance && !(assistant.llmTriageGuidance?.reproSteps?.length) && (
+              {!assistant.reproGuidance && (
                 <div className="text-center py-6 text-muted-foreground text-sm">
                   Could not detect a specific vulnerability class for reproduction guidance.
                 </div>

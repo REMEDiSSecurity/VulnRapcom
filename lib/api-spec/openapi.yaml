@@ -1252,6 +1252,9 @@ components:
           type: string
         note:
           type: ["string", "null"]
+        source:
+          type: ["string", "null"]
+          enum: [heuristic, llm, null]
       required:
         - order
         - instruction
@@ -1294,6 +1297,9 @@ components:
           type: string
         suggestion:
           type: string
+        audience:
+          type: ["string", "null"]
+          enum: [triager, reporter, both, null]
       required:
         - category
         - severity
@@ -1322,6 +1328,8 @@ components:
           enum: [positive, neutral, concern]
         message:
           type: string
+        priority:
+          type: ["integer", "null"]
       required:
         - tone
         - message
