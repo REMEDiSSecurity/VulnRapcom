@@ -144,6 +144,25 @@ export function detectProjects(text: string): DetectedProject[] {
     }
   }
 
+  const npmRe = new RegExp(NPM_PACKAGE_RE.source, "g");
+  while ((m = npmRe.exec(text)) !== null) {
+    const pkg = m[1].replace(/['"].*$/, "").trim();
+    if (pkg && !seen.has(`npm:${pkg}`) && pkg.length > 1 && pkg.length <= 100) {
+      seen.add(`npm:${pkg}`);
+      projects.push({ name: pkg, repoSlug: pkg, source: "npm_package" });
+    }
+  }
+
+  const pypiRe = new RegExp(PYPI_PACKAGE_RE.source, "g");
+  while ((m = pypiRe.exec(text)) !== null) {
+    const pkg = m[1].trim();
+    const PYTHON_STDLIB = new Set(["os", "sys", "re", "json", "time", "datetime", "math", "random", "io", "typing", "collections", "itertools", "functools", "pathlib", "subprocess", "socket", "http", "urllib", "hashlib", "base64", "struct", "copy", "enum", "abc", "logging", "unittest", "argparse", "csv", "xml", "html", "string", "textwrap", "shutil", "glob", "tempfile", "threading", "multiprocessing", "asyncio", "contextlib", "dataclasses", "inspect", "traceback", "warnings", "signal", "ctypes"]);
+    if (pkg && !seen.has(`pypi:${pkg}`) && pkg.length > 1 && pkg.length <= 100 && !PYTHON_STDLIB.has(pkg.toLowerCase())) {
+      seen.add(`pypi:${pkg}`);
+      projects.push({ name: pkg, repoSlug: pkg, source: "pypi_package" });
+    }
+  }
+
   return projects.slice(0, 10);
 }
 
@@ -236,11 +255,21 @@ async function verifyGitHubReferences(
     if (checksPerformed >= MAX_CHECKS) break;
     checksPerformed++;
 
-    const url = `https://api.github.com/repos/${repoSlug}/contents/${encodeURIComponent(fp)}`;
+    const encodedPath = fp.split("/").map(encodeURIComponent).join("/");
+    const url = `https://api.github.com/repos/${repoSlug}/contents/${encodedPath}`;
     const resp = await githubFetch(url);
     await delay(200);
 
-    if (resp.ok) {
+    if (resp.status === 0) {
+      checks.push({
+        type: "github_api_error",
+        target: `${repoSlug}:${fp}`,
+        result: "error",
+        detail: `GitHub API unreachable while verifying "${fp}"`,
+        weight: 0,
+      });
+      continue;
+    } else if (resp.ok) {
       checks.push({
         type: "github_file_verified",
         target: `${repoSlug}:${fp}`,
@@ -276,7 +305,16 @@ async function verifyGitHubReferences(
     const resp = await githubFetch(searchUrl);
     await delay(200);
 
-    if (resp.ok && resp.data) {
+    if (resp.status === 0) {
+      checks.push({
+        type: "github_api_error",
+        target: `${repoSlug}:${fn}`,
+        result: "error",
+        detail: `GitHub API unreachable while searching for "${fn}"`,
+        weight: 0,
+      });
+      continue;
+    } else if (resp.ok && resp.data) {
       const d = resp.data as { total_count?: number };
       if ((d.total_count ?? 0) > 0) {
         checks.push({
@@ -319,9 +357,9 @@ interface NvdVulnerability {
   };
 }
 
-async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: string }> {
+async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: string; error?: boolean }> {
   const cacheKey = "nvd:" + cveId;
-  const cached = cacheGet<{ found: boolean; description?: string }>(cacheKey);
+  const cached = cacheGet<{ found: boolean; description?: string; error?: boolean }>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -335,9 +373,12 @@ async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: 
     clearTimeout(timeout);
 
     if (!resp.ok) {
-      const result = { found: false };
-      if (resp.status === 404 || resp.status === 200) cacheSet(cacheKey, result);
-      return result;
+      if (resp.status === 404) {
+        const result = { found: false };
+        cacheSet(cacheKey, result);
+        return result;
+      }
+      return { found: false, error: true };
     }
 
     const data = (await resp.json()) as { vulnerabilities?: NvdVulnerability[] };
@@ -353,7 +394,7 @@ async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: 
     cacheSet(cacheKey, result);
     return result;
   } catch {
-    return { found: false };
+    return { found: false, error: true };
   }
 }
 
@@ -403,10 +444,18 @@ async function verifyCveReferences(text: string): Promise<VerificationCheck[]> {
     const currentYear = new Date().getFullYear();
     if (year > currentYear + 1 || year < 1999) continue;
 
-    const result = await nvdFetch(cveId);
+    const nvdResult = await nvdFetch(cveId);
     await delay(300);
 
-    if (!result.found) {
+    if (nvdResult.error) {
+      checks.push({
+        type: "nvd_api_error",
+        target: cveId,
+        result: "error",
+        detail: `NVD API error while looking up ${cveId} — skipped verification`,
+        weight: 0,
+      });
+    } else if (!nvdResult.found) {
       checks.push({
         type: "cve_not_in_nvd",
         target: cveId,
@@ -415,7 +464,7 @@ async function verifyCveReferences(text: string): Promise<VerificationCheck[]> {
         weight: 20,
       });
     } else {
-      const similarity = result.description ? computePhraseSimilarity(text, result.description) : 0;
+      const similarity = nvdResult.description ? computePhraseSimilarity(text, nvdResult.description) : 0;
 
       if (similarity > 30) {
         checks.push({
@@ -577,9 +626,19 @@ export async function performActiveVerification(text: string): Promise<Verificat
   );
 
   if (githubProjects.length > 0 && (codeRefs.functions.length > 0 || codeRefs.filePaths.length > 0)) {
-    const topProject = githubProjects[0];
-    const ghChecks = await verifyGitHubReferences(topProject.repoSlug, codeRefs);
-    allChecks.push(...ghChecks);
+    let totalGhChecks = 0;
+    const MAX_TOTAL_GH_CHECKS = 5;
+    for (const project of githubProjects) {
+      if (totalGhChecks >= MAX_TOTAL_GH_CHECKS) break;
+      const remainingBudget = MAX_TOTAL_GH_CHECKS - totalGhChecks;
+      const limitedRefs = {
+        filePaths: codeRefs.filePaths.slice(0, remainingBudget),
+        functions: codeRefs.functions.slice(0, Math.max(0, remainingBudget - codeRefs.filePaths.length)),
+      };
+      const ghChecks = await verifyGitHubReferences(project.repoSlug, limitedRefs);
+      allChecks.push(...ghChecks);
+      totalGhChecks += ghChecks.length;
+    }
   }
 
   const cveChecks = await verifyCveReferences(text);
