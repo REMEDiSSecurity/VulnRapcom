@@ -293,17 +293,129 @@ function analyzeCveReferences(text: string): { score: number; evidence: FactualE
   return { score, evidence };
 }
 
+function analyzeFabricatedCves(text: string): { score: number; evidence: FactualEvidence[] } {
+  const evidence: FactualEvidence[] = [];
+  let totalWeight = 0;
+
+  const cvePattern = /CVE-(\d{4})-(\d{4,})/g;
+  let match;
+  const cveIds: Array<{ full: string; year: number; id: number }> = [];
+
+  while ((match = cvePattern.exec(text)) !== null) {
+    cveIds.push({ full: match[0], year: parseInt(match[1]), id: parseInt(match[2]) });
+  }
+
+  if (cveIds.length >= 2) {
+    const ids = cveIds.map(c => c.id).sort((a, b) => a - b);
+    let sequentialCount = 0;
+    for (let i = 1; i < ids.length; i++) {
+      if (ids[i] - ids[i - 1] === 1) sequentialCount++;
+    }
+    if (sequentialCount >= 2) {
+      totalWeight += 15;
+      evidence.push({
+        type: "fabricated_cve",
+        description: `${sequentialCount + 1} CVE IDs with sequential numbering (${cveIds.slice(0, 3).map(c => c.full).join(", ")}) — real CVE IDs are not sequentially assigned`,
+        weight: 15,
+      });
+    }
+
+    const roundIds = cveIds.filter(c => c.id % 1000 === 0);
+    if (roundIds.length >= 2) {
+      totalWeight += 10;
+      evidence.push({
+        type: "fabricated_cve",
+        description: `Multiple CVE IDs with suspiciously round numbers (${roundIds.map(c => c.full).join(", ")})`,
+        weight: 10,
+      });
+    }
+  }
+
+  for (const cve of cveIds) {
+    if (/^\d{4,}$/.test(String(cve.id)) && String(cve.id).length > 7) {
+      totalWeight += 8;
+      evidence.push({
+        type: "fabricated_cve",
+        description: `${cve.full} has an unusually long ID number — most real CVEs have 4-7 digit IDs`,
+        weight: 8,
+        matched: cve.full,
+      });
+    }
+  }
+
+  const score = Math.min(100, Math.round(30 * Math.log1p(totalWeight)));
+  return { score, evidence };
+}
+
+function analyzeHallucinatedFunctions(text: string): { score: number; evidence: FactualEvidence[] } {
+  const evidence: FactualEvidence[] = [];
+  let totalWeight = 0;
+
+  const stackFuncPattern = /(?:in|at|from)\s+([a-zA-Z_][a-zA-Z0-9_]{2,}(?:::[a-zA-Z_][a-zA-Z0-9_]*)*)\s*\(/g;
+  let match;
+  const extractedFunctions: string[] = [];
+
+  while ((match = stackFuncPattern.exec(text)) !== null) {
+    extractedFunctions.push(match[1]);
+  }
+
+  const codeRefPattern = /(?:function|method|routine|handler)\s+`?([a-zA-Z_][a-zA-Z0-9_:]*)`?/gi;
+  while ((match = codeRefPattern.exec(text)) !== null) {
+    extractedFunctions.push(match[1]);
+  }
+
+  const unique = [...new Set(extractedFunctions)];
+
+  for (const fn of unique) {
+    const parts = fn.split(/(?=[A-Z])|_/).filter(Boolean);
+    if (parts.length >= 5) {
+      const hasNonsense = parts.some(p => /^(?:process|handle|execute|validate|check|verify|parse|manage|init|create|update|delete|get|set|do|run|perform|ensure|apply)$/i.test(p));
+      const genericCount = parts.filter(p => /^(?:data|input|output|request|response|buffer|stream|object|item|value|result|context|state|config|info|util|helper|service|manager|handler|controller|processor|validator|factory|builder|wrapper|adapter|decorator|observer|listener|callback|resolver|provider|consumer|producer|dispatcher|scheduler|executor|coordinator|orchestrator)$/i.test(p)).length;
+
+      if (hasNonsense && genericCount >= 2) {
+        totalWeight += 10;
+        evidence.push({
+          type: "hallucinated_function",
+          description: `Function "${fn}" appears to be hallucinated — composed of generic programming terms without domain specificity`,
+          weight: 10,
+          matched: fn,
+        });
+      }
+    }
+  }
+
+  if (unique.length >= 5) {
+    const camelCaseCount = unique.filter(fn => /^[a-z]+(?:[A-Z][a-z]+){3,}$/.test(fn)).length;
+    const snakeCaseCount = unique.filter(fn => /^[a-z]+(?:_[a-z]+){3,}$/.test(fn)).length;
+    if (camelCaseCount >= 3 && snakeCaseCount >= 3) {
+      totalWeight += 8;
+      evidence.push({
+        type: "hallucinated_function",
+        description: "Function names mix camelCase and snake_case conventions inconsistently — suggests fabricated rather than observed function names",
+        weight: 8,
+      });
+    }
+  }
+
+  const score = Math.min(100, Math.round(30 * Math.log1p(totalWeight)));
+  return { score, evidence };
+}
+
 export function analyzeFactual(text: string): FactualResult {
   const severity = analyzeSeverityInflation(text);
   const placeholders = analyzePlaceholderUrls(text);
   const fabricated = analyzeFabricatedOutput(text);
   const cveCheck = analyzeCveReferences(text);
+  const fabricatedCves = analyzeFabricatedCves(text);
+  const hallucinatedFuncs = analyzeHallucinatedFunctions(text);
 
   const combinedScore = Math.min(100, Math.round(
-    severity.score * 0.30 +
-    placeholders.score * 0.25 +
-    fabricated.score * 0.25 +
-    cveCheck.score * 0.20
+    severity.score * 0.25 +
+    placeholders.score * 0.20 +
+    fabricated.score * 0.20 +
+    cveCheck.score * 0.15 +
+    fabricatedCves.score * 0.10 +
+    hallucinatedFuncs.score * 0.10
   ));
 
   return {
@@ -316,6 +428,8 @@ export function analyzeFactual(text: string): FactualResult {
       ...placeholders.evidence,
       ...fabricated.evidence,
       ...cveCheck.evidence,
+      ...fabricatedCves.evidence,
+      ...hallucinatedFuncs.evidence,
     ],
   };
 }
