@@ -472,7 +472,7 @@ export default function Results() {
   const qualityScore = report.qualityScore as number | undefined;
   const confidence = report.confidence as number | undefined;
 
-  const adjusted = adjustScore(report.slopScore, sensitivity);
+  const adjusted = adjustScore(report.slopScore, sensitivity, breakdown, humanIndicators);
   const isAdjusted = sensitivity !== "balanced";
   const displayScore = isAdjusted ? adjusted : report.slopScore;
   const displayTier = isAdjusted ? adjustTier(adjusted, settings.slopThresholdLow, settings.slopThresholdHigh) : report.slopTier;

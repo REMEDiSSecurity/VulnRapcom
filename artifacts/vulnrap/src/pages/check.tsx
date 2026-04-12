@@ -10,6 +10,7 @@ import { cn, anonymizeId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { addHistoryEntry } from "@/lib/history";
+import { getSettings, saveSettings, getSlopColorCustom, getSlopProgressColorCustom, adjustScore, adjustTier, SENSITIVITY_PRESETS, type SensitivityPreset } from "@/lib/settings";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".md"];
@@ -37,15 +38,13 @@ function Hint({ text }: { text: string }) {
 }
 
 function getSlopColor(score: number) {
-  if (score <= 20) return "text-green-500";
-  if (score <= 55) return "text-yellow-500";
-  return "text-destructive";
+  const s = getSettings();
+  return getSlopColorCustom(score, s.slopThresholdLow, s.slopThresholdHigh);
 }
 
 function getSlopProgressColor(score: number) {
-  if (score <= 20) return "bg-green-500";
-  if (score <= 55) return "bg-yellow-500";
-  return "bg-destructive";
+  const s = getSettings();
+  return getSlopProgressColorCustom(score, s.slopThresholdLow, s.slopThresholdHigh);
 }
 
 function getQualityColor(score: number) {
@@ -64,6 +63,81 @@ function getConfidenceColor(confidence: number): string {
   if (confidence >= 0.8) return "text-green-400";
   if (confidence >= 0.5) return "text-yellow-400";
   return "text-orange-400";
+}
+
+function CheckScoreContent({ result, sensitivity, onSensitivityChange }: {
+  result: CheckResultData;
+  sensitivity: SensitivityPreset;
+  onSensitivityChange: (preset: SensitivityPreset) => void;
+}) {
+  const settings = getSettings();
+  const isAdj = sensitivity !== "balanced";
+  const adjScore = adjustScore(result.slopScore, sensitivity, result.breakdown, result.humanIndicators);
+  const dispScore = isAdj ? adjScore : result.slopScore;
+  const dispTier = isAdj ? adjustTier(adjScore, settings.slopThresholdLow, settings.slopThresholdHigh) : result.slopTier;
+
+  return (
+    <CardContent className="flex flex-col items-center py-4">
+      <div className="flex items-center justify-center gap-1 mb-3">
+        {(Object.entries(SENSITIVITY_PRESETS) as [SensitivityPreset, { label: string; description: string }][]).map(([key, preset]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onSensitivityChange(key)}
+            className={`px-3 py-1 text-[10px] font-medium rounded-md transition-all ${
+              sensitivity === key
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted/30"
+            }`}
+            title={preset.description}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="flex flex-col items-center">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Slop</div>
+          <div className={`text-4xl font-bold font-mono ${getSlopColor(dispScore)} glow-text`}>{dispScore}</div>
+          <div className="mt-1 text-xs font-medium uppercase">{dispTier}</div>
+          {isAdj && (
+            <div className="mt-0.5 text-[10px] text-muted-foreground">
+              canonical: {result.slopScore} ({result.slopTier})
+            </div>
+          )}
+        </div>
+        {result.qualityScore != null && (
+          <>
+            <div className="h-14 w-px bg-border/30" />
+            <div className="flex flex-col items-center">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Quality</div>
+              <div className={`text-4xl font-bold font-mono ${getQualityColor(result.qualityScore)} glow-text`}>{result.qualityScore}</div>
+              <div className="mt-1 text-xs font-medium uppercase text-muted-foreground">
+                {result.qualityScore >= 70 ? "Good" : result.qualityScore >= 40 ? "Fair" : "Poor"}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      {result.confidence != null && (
+        <div className="w-full max-w-xs mt-3 flex items-center gap-2">
+          <Gauge className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 space-y-0.5">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Confidence</span>
+              <span className={`font-mono font-bold ${getConfidenceColor(result.confidence)}`}>
+                {(result.confidence * 100).toFixed(0)}% — {getConfidenceLabel(result.confidence)}
+              </span>
+            </div>
+            <Progress value={result.confidence * 100} className="h-1" indicatorClassName={result.confidence >= 0.8 ? "bg-green-500" : result.confidence >= 0.5 ? "bg-yellow-500" : "bg-orange-500"} />
+          </div>
+        </div>
+      )}
+      <div className="w-full max-w-xs mt-3">
+        <Progress value={dispScore} className="h-2" indicatorClassName={getSlopProgressColor(dispScore)} />
+      </div>
+    </CardContent>
+  );
 }
 
 function LlmDimensionBar({ label, score }: { label: string; score: number }) {
@@ -148,6 +222,11 @@ export default function Check() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<CheckResultData | null>(null);
   const [showAllEvidence, setShowAllEvidence] = useState(false);
+  const [sensitivity, setSensitivity] = useState<SensitivityPreset>(() => getSettings().sensitivityPreset);
+  const handleSensitivityChange = (preset: SensitivityPreset) => {
+    setSensitivity(preset);
+    saveSettings({ sensitivityPreset: preset });
+  };
 
   const checkMutation = useCheckReport({
     mutation: {
@@ -407,44 +486,7 @@ export default function Check() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col items-center py-4">
-                <div className="flex items-center gap-6">
-                  <div className="flex flex-col items-center">
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Slop</div>
-                    <div className={`text-4xl font-bold font-mono ${getSlopColor(result.slopScore)} glow-text`}>{result.slopScore}</div>
-                    <div className="mt-1 text-xs font-medium uppercase">{result.slopTier}</div>
-                  </div>
-                  {result.qualityScore != null && (
-                    <>
-                      <div className="h-14 w-px bg-border/30" />
-                      <div className="flex flex-col items-center">
-                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Quality</div>
-                        <div className={`text-4xl font-bold font-mono ${getQualityColor(result.qualityScore)} glow-text`}>{result.qualityScore}</div>
-                        <div className="mt-1 text-xs font-medium uppercase text-muted-foreground">
-                          {result.qualityScore >= 70 ? "Good" : result.qualityScore >= 40 ? "Fair" : "Poor"}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-                {result.confidence != null && (
-                  <div className="w-full max-w-xs mt-3 flex items-center gap-2">
-                    <Gauge className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                    <div className="flex-1 space-y-0.5">
-                      <div className="flex justify-between text-[10px]">
-                        <span className="text-muted-foreground">Confidence</span>
-                        <span className={`font-mono font-bold ${getConfidenceColor(result.confidence)}`}>
-                          {(result.confidence * 100).toFixed(0)}% — {getConfidenceLabel(result.confidence)}
-                        </span>
-                      </div>
-                      <Progress value={result.confidence * 100} className="h-1" indicatorClassName={result.confidence >= 0.8 ? "bg-green-500" : result.confidence >= 0.5 ? "bg-yellow-500" : "bg-orange-500"} />
-                    </div>
-                  </div>
-                )}
-                <div className="w-full max-w-xs mt-3">
-                  <Progress value={result.slopScore} className="h-2" indicatorClassName={getSlopProgressColor(result.slopScore)} />
-                </div>
-              </CardContent>
+              <CheckScoreContent result={result} sensitivity={sensitivity} onSensitivityChange={handleSensitivityChange} />
             </Card>
 
             <Card className="glass-card rounded-xl">
