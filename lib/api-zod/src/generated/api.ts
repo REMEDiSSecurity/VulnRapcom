@@ -375,6 +375,12 @@ export const GetReportResponse = zod.object({
                   "Score change from original (negative = improved, positive = worsened)",
                 ),
               direction: zod.enum(["improved", "worsened", "unchanged"]),
+              changeSummary: zod
+                .string()
+                .optional()
+                .describe(
+                  "Brief summary of what changed between original and revision",
+                ),
             }),
             zod.null(),
           ])
@@ -795,6 +801,12 @@ export const CheckReportResponse = zod.object({
                   "Score change from original (negative = improved, positive = worsened)",
                 ),
               direction: zod.enum(["improved", "worsened", "unchanged"]),
+              changeSummary: zod
+                .string()
+                .optional()
+                .describe(
+                  "Brief summary of what changed between original and revision",
+                ),
             }),
             zod.null(),
           ])

@@ -14,4 +14,6 @@ export interface RevisionResult {
   /** Score change from original (negative = improved, positive = worsened) */
   scoreChange: number;
   direction: RevisionResultDirection;
+  /** Brief summary of what changed between original and revision */
+  changeSummary?: string;
 }

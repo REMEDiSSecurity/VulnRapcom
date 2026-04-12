@@ -343,6 +343,9 @@ function TriageCard({ triage, challengeQuestions, temporalSignals, templateMatch
               <div className="text-xs text-muted-foreground">
                 {revision.similarity.toFixed(0)}% similar to original (score: {revision.originalScore})
               </div>
+              {revision.changeSummary && (
+                <p className="text-xs text-muted-foreground mt-1 italic">{revision.changeSummary}</p>
+              )}
             </div>
           </div>
         )}

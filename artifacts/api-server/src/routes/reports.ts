@@ -406,6 +406,28 @@ router.post("/reports", async (req, res): Promise<void> => {
     analysisResult.triageRecommendation.revision = revisionResult;
   }
 
+  const isRevision = revisionResult !== null;
+
+  if (templateMatch) {
+    analysisResult.evidence.push({
+      type: "template_reuse",
+      description: `Report structure matches ${templateMatch.matchedReportIds.length} previous submission(s) — possible mass-generated template`,
+      weight: templateMatch.weight,
+    });
+    analysisResult.slopScore = Math.min(95, analysisResult.slopScore + templateMatch.weight);
+  }
+
+  if (analysisResult.triageRecommendation) {
+    for (const ts of analysisResult.triageRecommendation.temporalSignals) {
+      analysisResult.evidence.push({
+        type: "temporal_signal",
+        description: `${ts.cveId}: report submitted ${ts.hoursSincePublication.toFixed(1)}h after CVE publication (${ts.signal.replace(/_/g, " ")})`,
+        weight: ts.weight,
+      });
+      analysisResult.slopScore = Math.min(95, analysisResult.slopScore + ts.weight);
+    }
+  }
+
   const report = await db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(reportsTable)
@@ -456,13 +478,15 @@ router.post("/reports", async (req, res): Promise<void> => {
       );
     }
 
-    await tx
-      .insert(reportStatsTable)
-      .values({ key: "total_reports", value: 1 })
-      .onConflictDoUpdate({
-        target: reportStatsTable.key,
-        set: { value: sql`${reportStatsTable.value} + 1` },
-      });
+    if (!isRevision) {
+      await tx
+        .insert(reportStatsTable)
+        .values({ key: "total_reports", value: 1 })
+        .onConflictDoUpdate({
+          target: reportStatsTable.key,
+          set: { value: sql`${reportStatsTable.value} + 1` },
+        });
+    }
 
     if (similarityMatches.length > 0) {
       await tx
@@ -920,11 +944,31 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
       }
     }
 
+    let revisionResult: TriageRecommendation["revision"] = null;
+    try {
+      const simMatches = (report.similarityMatches ?? []) as Array<{ reportId: number; similarity: number; matchType: string }>;
+      const highSimMatch = simMatches.find(m => m.similarity >= 70);
+      if (highSimMatch) {
+        const cutoff48h = new Date(report.createdAt.getTime() - 48 * 60 * 60 * 1000);
+        const [matchedRow] = await db
+          .select({ id: reportsTable.id, slopScore: reportsTable.slopScore, createdAt: reportsTable.createdAt })
+          .from(reportsTable)
+          .where(eq(reportsTable.id, highSimMatch.reportId));
+        if (matchedRow && matchedRow.createdAt >= cutoff48h) {
+          revisionResult = detectRevision(report.slopScore ?? 50, {
+            id: matchedRow.id,
+            slopScore: matchedRow.slopScore ?? 50,
+            similarity: highSimMatch.similarity,
+          });
+        }
+      }
+    } catch {}
+
     triageRecommendation = {
       ...base,
       temporalSignals,
       templateMatch,
-      revision: null,
+      revision: revisionResult,
     };
   } catch {}
 
@@ -994,7 +1038,27 @@ router.get("/reports/:id/triage-report", async (req, res): Promise<void> => {
       (report.evidence as EvidenceItem[]) ?? [],
     );
     const temporalSignals = computeTemporalSignals(verification);
-    triageRecommendation = { ...base, temporalSignals, templateMatch: null, revision: null };
+    let mdRevision: TriageRecommendation["revision"] = null;
+    try {
+      const simMatches = (report.similarityMatches ?? []) as Array<{ reportId: number; similarity: number; matchType: string }>;
+      const highSimMatch = simMatches.find(m => m.similarity >= 70);
+      if (highSimMatch) {
+        const cutoff48h = new Date(report.createdAt.getTime() - 48 * 60 * 60 * 1000);
+        const [matchedRow] = await db
+          .select({ id: reportsTable.id, slopScore: reportsTable.slopScore, createdAt: reportsTable.createdAt })
+          .from(reportsTable)
+          .where(eq(reportsTable.id, highSimMatch.reportId));
+        if (matchedRow && matchedRow.createdAt >= cutoff48h) {
+          mdRevision = detectRevision(report.slopScore ?? 50, {
+            id: matchedRow.id,
+            slopScore: matchedRow.slopScore ?? 50,
+            similarity: highSimMatch.similarity,
+          });
+        }
+      }
+    } catch {}
+
+    triageRecommendation = { ...base, temporalSignals, templateMatch: null, revision: mdRevision };
   } catch {}
 
   const lines: string[] = [];
@@ -1031,6 +1095,19 @@ router.get("/reports/:id/triage-report", async (req, res): Promise<void> => {
       lines.push("");
       for (const s of triageRecommendation.temporalSignals) {
         lines.push(`- **${s.cveId}**: ${s.signal} (${s.hoursSincePublication.toFixed(1)}h since publication, weight ${s.weight})`);
+      }
+      lines.push("");
+    }
+
+    if (triageRecommendation.revision) {
+      const rev = triageRecommendation.revision;
+      lines.push("## Revision Detection");
+      lines.push("");
+      lines.push(`- **Original Report**: #${rev.originalReportId}`);
+      lines.push(`- **Similarity**: ${rev.similarity.toFixed(0)}%`);
+      lines.push(`- **Direction**: ${rev.direction} (${rev.originalScore} → ${report.slopScore ?? 50}, change: ${rev.scoreChange})`);
+      if (rev.changeSummary) {
+        lines.push(`- **Summary**: ${rev.changeSummary}`);
       }
       lines.push("");
     }

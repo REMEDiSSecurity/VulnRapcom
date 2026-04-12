@@ -45,6 +45,7 @@ export interface RevisionResult {
   similarity: number;
   scoreChange: number;
   direction: "improved" | "worsened" | "unchanged";
+  changeSummary?: string;
 }
 
 export function generateTriageRecommendation(
@@ -273,11 +274,22 @@ export function detectRevision(
   if (scoreChange <= -5) direction = "improved";
   else if (scoreChange >= 5) direction = "worsened";
 
+  const pctChanged = (100 - matchedReport.similarity).toFixed(0);
+  let changeSummary: string;
+  if (direction === "improved") {
+    changeSummary = `Revision of report #${matchedReport.id} with ${pctChanged}% content changed. Slop score dropped ${Math.abs(scoreChange)} points (${matchedReport.slopScore} → ${currentScore}), suggesting the reporter addressed flagged issues.`;
+  } else if (direction === "worsened") {
+    changeSummary = `Revision of report #${matchedReport.id} with ${pctChanged}% content changed. Slop score increased ${scoreChange} points (${matchedReport.slopScore} → ${currentScore}), suggesting additional generated content was added.`;
+  } else {
+    changeSummary = `Revision of report #${matchedReport.id} with ${pctChanged}% content changed. Slop score remained similar (${matchedReport.slopScore} → ${currentScore}).`;
+  }
+
   return {
     originalReportId: matchedReport.id,
     originalScore: matchedReport.slopScore,
     similarity: matchedReport.similarity,
     scoreChange,
     direction,
+    changeSummary,
   };
 }

@@ -1223,6 +1223,9 @@ components:
         direction:
           type: string
           enum: [improved, worsened, unchanged]
+        changeSummary:
+          type: string
+          description: Brief summary of what changed between original and revision
       required:
         - originalReportId
         - originalScore
