@@ -54,8 +54,8 @@ export function getSlopColorCustom(
   low: number,
   high: number
 ): string {
-  if (score < low) return "text-green-500";
-  if (score < high) return "text-yellow-500";
+  if (score <= low) return "text-green-500";
+  if (score <= high) return "text-yellow-500";
   return "text-destructive";
 }
 
@@ -64,7 +64,7 @@ export function getSlopProgressColorCustom(
   low: number,
   high: number
 ): string {
-  if (score < low) return "bg-green-500";
-  if (score < high) return "bg-yellow-500";
+  if (score <= low) return "bg-green-500";
+  if (score <= high) return "bg-yellow-500";
   return "bg-destructive";
 }
