@@ -23,18 +23,26 @@ import { analyzeSloppiness } from "../lib/sloppiness";
 import { analyzeSlopWithLLM, shouldCallLLM, isLLMAvailable, type LLMSlopResult } from "../lib/llm-slop";
 import { analyzeLinguistic } from "../lib/linguistic-analysis";
 import { analyzeFactual } from "../lib/factual-verification";
-import { fuseScores, type FusionResult } from "../lib/score-fusion";
+import { fuseScores, type FusionResult, type EvidenceItem } from "../lib/score-fusion";
 import { redactReport } from "../lib/redactor";
 import { parseSections, findSectionMatches } from "../lib/section-parser";
 import { sanitizeText, sanitizeFileName, detectBinaryContent } from "../lib/sanitize";
 import { extractTextFromPdf } from "../lib/pdf";
 import { logger } from "../lib/logger";
 import { performActiveVerification, type VerificationResult } from "../lib/active-verification";
+import {
+  generateTriageRecommendation,
+  computeTemporalSignals,
+  computeTemplateHash,
+  detectRevision,
+  type TriageRecommendation,
+} from "../lib/triage-recommendation";
 
 interface AnalysisResult extends FusionResult {
   feedback: string[];
   llmResult: Awaited<ReturnType<typeof analyzeSlopWithLLM>>;
   verification: VerificationResult | null;
+  triageRecommendation: TriageRecommendation | null;
 }
 
 async function performAnalysis(originalText: string, redactedText: string): Promise<AnalysisResult> {
@@ -65,11 +73,31 @@ async function performAnalysis(originalText: string, redactedText: string): Prom
     ? fuseScores(linguistic, factual, llmResult, heuristic.qualityScore, originalText, undefined, verification)
     : preliminary;
 
+  let triageRecommendation: TriageRecommendation | null = null;
+  try {
+    const base = generateTriageRecommendation(
+      fusion.slopScore,
+      fusion.confidence,
+      verification,
+      fusion.evidence,
+    );
+    const temporalSignals = computeTemporalSignals(verification);
+    triageRecommendation = {
+      ...base,
+      temporalSignals,
+      templateMatch: null,
+      revision: null,
+    };
+  } catch (err) {
+    logger.warn({ err }, "Triage recommendation generation failed");
+  }
+
   return {
     ...fusion,
     feedback: heuristic.feedback,
     llmResult,
     verification,
+    triageRecommendation,
   };
 }
 
@@ -336,6 +364,46 @@ router.post("/reports", async (req, res): Promise<void> => {
   const { llmResult } = analysisResult;
 
   const deleteToken = crypto.randomBytes(32).toString("hex");
+  const templateHash = computeTemplateHash(redactedText);
+
+  let templateMatch: TriageRecommendation["templateMatch"] = null;
+  try {
+    const templateDuplicates = await db
+      .select({ id: reportsTable.id })
+      .from(reportsTable)
+      .where(eq(reportsTable.templateHash, templateHash))
+      .limit(10);
+    if (templateDuplicates.length > 0) {
+      templateMatch = {
+        templateHash,
+        matchedReportIds: templateDuplicates.map(r => r.id),
+        weight: Math.min(templateDuplicates.length * 3, 15),
+      };
+    }
+  } catch {}
+
+  let revisionResult: TriageRecommendation["revision"] = null;
+  try {
+    const highSimMatch = similarityMatches.find(m => m.similarity >= 70);
+    if (highSimMatch) {
+      const [matchedRow] = await db
+        .select({ id: reportsTable.id, slopScore: reportsTable.slopScore })
+        .from(reportsTable)
+        .where(eq(reportsTable.id, highSimMatch.reportId));
+      if (matchedRow) {
+        revisionResult = detectRevision(analysisResult.slopScore, {
+          id: matchedRow.id,
+          slopScore: matchedRow.slopScore ?? 50,
+          similarity: highSimMatch.similarity,
+        });
+      }
+    }
+  } catch {}
+
+  if (analysisResult.triageRecommendation) {
+    analysisResult.triageRecommendation.templateMatch = templateMatch;
+    analysisResult.triageRecommendation.revision = revisionResult;
+  }
 
   const report = await db.transaction(async (tx) => {
     const [inserted] = await tx
@@ -367,6 +435,7 @@ router.post("/reports", async (req, res): Promise<void> => {
         showInFeed,
         fileName: safeFileName,
         fileSize: rawFileSize,
+        templateHash,
       })
       .returning();
 
@@ -430,6 +499,7 @@ router.post("/reports", async (req, res): Promise<void> => {
     llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
     verification: analysisResult.verification ?? null,
+    triageRecommendation: analysisResult.triageRecommendation ?? null,
     fileName: report.fileName,
     fileSize: report.fileSize,
     createdAt: report.createdAt,
@@ -564,6 +634,7 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     llmBreakdown: checkLlmResult?.llmBreakdown ?? null,
     llmEnhanced: checkLlmResult != null,
     verification: analysisResult.verification ?? null,
+    triageRecommendation: analysisResult.triageRecommendation ?? null,
     previouslySubmitted: !!existingReport,
     existingReportId: existingReport?.id ?? null,
   });
@@ -821,6 +892,41 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     }
   }
 
+  let triageRecommendation: TriageRecommendation | null = null;
+  try {
+    const base = generateTriageRecommendation(
+      report.slopScore ?? 50,
+      (report.confidence as number) ?? 0.5,
+      verification,
+      (report.evidence as EvidenceItem[]) ?? [],
+    );
+    const temporalSignals = computeTemporalSignals(verification);
+
+    let templateMatch: TriageRecommendation["templateMatch"] = null;
+    if (report.templateHash) {
+      const templateDuplicates = await db
+        .select({ id: reportsTable.id })
+        .from(reportsTable)
+        .where(eq(reportsTable.templateHash, report.templateHash as string))
+        .limit(10);
+      const others = templateDuplicates.filter(r => r.id !== report.id);
+      if (others.length > 0) {
+        templateMatch = {
+          templateHash: report.templateHash as string,
+          matchedReportIds: others.map(r => r.id),
+          weight: Math.min(others.length * 3, 15),
+        };
+      }
+    }
+
+    triageRecommendation = {
+      ...base,
+      temporalSignals,
+      templateMatch,
+      revision: null,
+    };
+  } catch {}
+
   const response = GetReportResponse.parse({
     id: report.id,
     contentHash: report.contentHash,
@@ -843,12 +949,119 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
     verification,
+    triageRecommendation,
     fileName: report.fileName,
     fileSize: report.fileSize,
     createdAt: report.createdAt,
   });
 
   res.json(response);
+});
+
+router.get("/reports/:id/triage-report", async (req, res): Promise<void> => {
+  const params = GetReportParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [report] = await db
+    .select()
+    .from(reportsTable)
+    .where(eq(reportsTable.id, params.data.id));
+
+  if (!report) {
+    res.status(404).json({ error: "Report not found." });
+    return;
+  }
+
+  let verification: VerificationResult | null = null;
+  if (report.redactedText) {
+    try {
+      verification = await performActiveVerification(report.redactedText);
+    } catch {
+      verification = null;
+    }
+  }
+
+  let triageRecommendation: TriageRecommendation | null = null;
+  try {
+    const base = generateTriageRecommendation(
+      report.slopScore ?? 50,
+      (report.confidence as number) ?? 0.5,
+      verification,
+      (report.evidence as EvidenceItem[]) ?? [],
+    );
+    const temporalSignals = computeTemporalSignals(verification);
+    triageRecommendation = { ...base, temporalSignals, templateMatch: null, revision: null };
+  } catch {}
+
+  const lines: string[] = [];
+  lines.push(`# VulnRap Triage Report — VR-${report.id.toString(16).padStart(4, "0").toUpperCase()}`);
+  lines.push("");
+  lines.push(`**Date**: ${new Date().toISOString()}`);
+  lines.push(`**Content Hash**: \`${report.contentHash}\``);
+  lines.push(`**Slop Score**: ${report.slopScore} (${report.slopTier})`);
+  lines.push(`**Confidence**: ${((report.confidence as number ?? 0.5) * 100).toFixed(0)}%`);
+  lines.push("");
+
+  if (triageRecommendation) {
+    lines.push("## Triage Recommendation");
+    lines.push("");
+    lines.push(`**Action**: ${triageRecommendation.action}`);
+    lines.push(`**Reason**: ${triageRecommendation.reason}`);
+    lines.push("");
+    lines.push(`> ${triageRecommendation.note}`);
+    lines.push("");
+
+    if (triageRecommendation.challengeQuestions.length > 0) {
+      lines.push("## Challenge Questions");
+      lines.push("");
+      for (const q of triageRecommendation.challengeQuestions) {
+        lines.push(`### ${q.category}`);
+        lines.push(`**Question**: ${q.question}`);
+        lines.push(`*Context*: ${q.context}`);
+        lines.push("");
+      }
+    }
+
+    if (triageRecommendation.temporalSignals.length > 0) {
+      lines.push("## Temporal Signals");
+      lines.push("");
+      for (const s of triageRecommendation.temporalSignals) {
+        lines.push(`- **${s.cveId}**: ${s.signal} (${s.hoursSincePublication.toFixed(1)}h since publication, weight ${s.weight})`);
+      }
+      lines.push("");
+    }
+  }
+
+  if (verification) {
+    lines.push("## Verification Results");
+    lines.push("");
+    lines.push(`| Check | Status | Detail |`);
+    lines.push(`|-------|--------|--------|`);
+    for (const check of verification.checks) {
+      const icon = check.result === "verified" ? "✅" : check.result === "not_found" ? "❌" : "⚠️";
+      lines.push(`| ${check.type} | ${icon} ${check.result} | ${check.detail} |`);
+    }
+    lines.push("");
+  }
+
+  const evidence = (report.evidence as EvidenceItem[]) ?? [];
+  if (evidence.length > 0) {
+    lines.push("## Evidence");
+    lines.push("");
+    for (const e of evidence) {
+      lines.push(`- **[${e.type}]** ${e.description} (weight: ${e.weight})`);
+    }
+    lines.push("");
+  }
+
+  lines.push("---");
+  lines.push("*Generated by VulnRap v2.1 — Free & Anonymous Vulnerability Report Validation*");
+
+  res.set("Content-Type", "text/markdown; charset=utf-8");
+  res.send(lines.join("\n"));
 });
 
 router.delete("/reports/:id", async (req, res): Promise<void> => {

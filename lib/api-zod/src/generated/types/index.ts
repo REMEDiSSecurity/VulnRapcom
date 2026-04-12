@@ -6,6 +6,7 @@
  * OpenAPI spec version: 2.0.0
  */
 
+export * from "./challengeQuestion";
 export * from "./checkReportBody";
 export * from "./checkResult";
 export * from "./checkResultLlmBreakdown";
@@ -39,6 +40,8 @@ export * from "./reportComparison";
 export * from "./reportFeed";
 export * from "./reportFeedReportsItem";
 export * from "./reportFeedReportsItemContentMode";
+export * from "./revisionResult";
+export * from "./revisionResultDirection";
 export * from "./scoreBreakdown";
 export * from "./sectionComparisonItem";
 export * from "./sectionComparisonItemStatus";
@@ -51,6 +54,11 @@ export * from "./submitFeedbackBody";
 export * from "./submitReportBody";
 export * from "./submitReportBodyContentMode";
 export * from "./submitReportBodyShowInFeed";
+export * from "./templateMatch";
+export * from "./temporalSignal";
+export * from "./temporalSignalSignal";
+export * from "./triageRecommendation";
+export * from "./triageRecommendationAction";
 export * from "./verification";
 export * from "./verificationBadge";
 export * from "./verificationCheck";

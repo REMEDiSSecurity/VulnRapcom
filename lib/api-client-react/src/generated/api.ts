@@ -578,6 +578,94 @@ export function useCompareReports<
 }
 
 /**
+ * Returns a formatted markdown summary with score, verification results, evidence, recommendation, and challenge questions — ready to paste into Jira/ServiceNow
+ * @summary Get exportable markdown triage report
+ */
+export const getGetTriageReportUrl = (id: number) => {
+  return `/api/reports/${id}/triage-report`;
+};
+
+export const getTriageReport = async (
+  id: number,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getGetTriageReportUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTriageReportQueryKey = (id: number) => {
+  return [`/api/reports/${id}/triage-report`] as const;
+};
+
+export const getGetTriageReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTriageReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTriageReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTriageReportQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTriageReport>>> = ({
+    signal,
+  }) => getTriageReport(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTriageReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTriageReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTriageReport>>
+>;
+export type GetTriageReportQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get exportable markdown triage report
+ */
+
+export function useGetTriageReport<
+  TData = Awaited<ReturnType<typeof getTriageReport>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTriageReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTriageReportQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * For report receivers -- analyze a report for similarity and sloppiness without adding it to the database
  * @summary Check a report against the database without storing it
  */

@@ -211,6 +211,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /reports/{id}/triage-report:
+    get:
+      operationId: getTriageReport
+      tags: [reports]
+      summary: Get exportable markdown triage report
+      description: Returns a formatted markdown summary with score, verification results, evidence, recommendation, and challenge questions — ready to paste into Jira/ServiceNow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Triage report markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "404":
+          description: Report not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /reports/check:
     post:
       operationId: checkReport
@@ -543,6 +569,11 @@ components:
             - $ref: "#/components/schemas/Verification"
             - type: "null"
           description: Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed.
+        triageRecommendation:
+          oneOf:
+            - $ref: "#/components/schemas/TriageRecommendation"
+            - type: "null"
+          description: Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.
         fileName:
           type: ["string", "null"]
         fileSize:
@@ -681,6 +712,11 @@ components:
             - $ref: "#/components/schemas/Verification"
             - type: "null"
           description: Active content verification results. Null when verification was not performed.
+        triageRecommendation:
+          oneOf:
+            - $ref: "#/components/schemas/TriageRecommendation"
+            - type: "null"
+          description: Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.
         previouslySubmitted:
           type: boolean
           description: Whether this exact report was found in the database
@@ -1076,6 +1112,123 @@ components:
         - type
         - description
         - weight
+
+    TriageRecommendation:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [AUTO_CLOSE, MANUAL_REVIEW, CHALLENGE_REPORTER, PRIORITIZE, STANDARD_TRIAGE]
+          description: Recommended triage action based on score, confidence, and verification results
+        reason:
+          type: string
+          description: Why this action was recommended
+        note:
+          type: string
+          description: Detailed guidance for the triager
+        challengeQuestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChallengeQuestion"
+          description: Questions to send to the reporter to verify legitimacy (1-4 questions based on detected issues)
+        temporalSignals:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemporalSignal"
+          description: Behavioral signals based on CVE publication timing
+        templateMatch:
+          oneOf:
+            - $ref: "#/components/schemas/TemplateMatch"
+            - type: "null"
+          description: Template reuse detection result. Null when no template match found.
+        revision:
+          oneOf:
+            - $ref: "#/components/schemas/RevisionResult"
+            - type: "null"
+          description: Revision tracking result — detected when a report is a revision of a recent submission. Null when not a revision.
+      required:
+        - action
+        - reason
+        - note
+        - challengeQuestions
+        - temporalSignals
+
+    ChallengeQuestion:
+      type: object
+      properties:
+        category:
+          type: string
+          description: Question category (missing_file, missing_function, nvd_plagiarism, invalid_cve, placeholder_poc, severity_inflation, fabricated_output)
+        question:
+          type: string
+          description: The question to send to the reporter
+        context:
+          type: string
+          description: Context about why this question was generated
+      required:
+        - category
+        - question
+        - context
+
+    TemporalSignal:
+      type: object
+      properties:
+        cveId:
+          type: string
+        publishedDate:
+          type: string
+          format: date-time
+        hoursSincePublication:
+          type: number
+        signal:
+          type: string
+          enum: [suspiciously_fast, fast_turnaround, normal]
+        weight:
+          type: integer
+      required:
+        - cveId
+        - publishedDate
+        - hoursSincePublication
+        - signal
+        - weight
+
+    TemplateMatch:
+      type: object
+      properties:
+        templateHash:
+          type: string
+        matchedReportIds:
+          type: array
+          items:
+            type: integer
+        weight:
+          type: integer
+      required:
+        - templateHash
+        - matchedReportIds
+        - weight
+
+    RevisionResult:
+      type: object
+      properties:
+        originalReportId:
+          type: integer
+        originalScore:
+          type: integer
+        similarity:
+          type: number
+        scoreChange:
+          type: integer
+          description: Score change from original (negative = improved, positive = worsened)
+        direction:
+          type: string
+          enum: [improved, worsened, unchanged]
+      required:
+        - originalReportId
+        - originalScore
+        - similarity
+        - scoreChange
+        - direction
 
     SubmitFeedbackBody:
       type: object

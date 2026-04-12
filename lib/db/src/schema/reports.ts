@@ -54,6 +54,7 @@ export const reportsTable = pgTable("reports", {
   llmFeedback: jsonb("llm_feedback").$type<string[]>(),
   llmBreakdown: jsonb("llm_breakdown").$type<{ specificity: number; originality: number; voice: number; coherence: number; hallucination: number }>(),
   humanIndicators: jsonb("human_indicators").$type<HumanIndicatorItem[]>().default([]),
+  templateHash: varchar("template_hash", { length: 64 }),
   showInFeed: boolean("show_in_feed").notNull().default(false),
   fileName: varchar("file_name", { length: 255 }),
   fileSize: integer("file_size").notNull(),
@@ -64,6 +65,7 @@ export const reportsTable = pgTable("reports", {
   index("idx_reports_created_at").on(table.createdAt),
   index("idx_reports_show_in_feed").on(table.showInFeed, table.createdAt),
   index("idx_reports_slop_score").on(table.slopScore),
+  index("idx_reports_template_hash").on(table.templateHash),
 ]);
 
 export interface SimilarityMatch {

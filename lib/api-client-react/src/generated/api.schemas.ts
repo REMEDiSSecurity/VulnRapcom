@@ -188,6 +188,87 @@ export interface Verification {
   detectedProjects: DetectedProject[];
 }
 
+/**
+ * Recommended triage action based on score, confidence, and verification results
+ */
+export type TriageRecommendationAction =
+  (typeof TriageRecommendationAction)[keyof typeof TriageRecommendationAction];
+
+export const TriageRecommendationAction = {
+  AUTO_CLOSE: "AUTO_CLOSE",
+  MANUAL_REVIEW: "MANUAL_REVIEW",
+  CHALLENGE_REPORTER: "CHALLENGE_REPORTER",
+  PRIORITIZE: "PRIORITIZE",
+  STANDARD_TRIAGE: "STANDARD_TRIAGE",
+} as const;
+
+export interface ChallengeQuestion {
+  /** Question category (missing_file, missing_function, nvd_plagiarism, invalid_cve, placeholder_poc, severity_inflation, fabricated_output) */
+  category: string;
+  /** The question to send to the reporter */
+  question: string;
+  /** Context about why this question was generated */
+  context: string;
+}
+
+export type TemporalSignalSignal =
+  (typeof TemporalSignalSignal)[keyof typeof TemporalSignalSignal];
+
+export const TemporalSignalSignal = {
+  suspiciously_fast: "suspiciously_fast",
+  fast_turnaround: "fast_turnaround",
+  normal: "normal",
+} as const;
+
+export interface TemporalSignal {
+  cveId: string;
+  publishedDate: string;
+  hoursSincePublication: number;
+  signal: TemporalSignalSignal;
+  weight: number;
+}
+
+export interface TemplateMatch {
+  templateHash: string;
+  matchedReportIds: number[];
+  weight: number;
+}
+
+export type RevisionResultDirection =
+  (typeof RevisionResultDirection)[keyof typeof RevisionResultDirection];
+
+export const RevisionResultDirection = {
+  improved: "improved",
+  worsened: "worsened",
+  unchanged: "unchanged",
+} as const;
+
+export interface RevisionResult {
+  originalReportId: number;
+  originalScore: number;
+  similarity: number;
+  /** Score change from original (negative = improved, positive = worsened) */
+  scoreChange: number;
+  direction: RevisionResultDirection;
+}
+
+export interface TriageRecommendation {
+  /** Recommended triage action based on score, confidence, and verification results */
+  action: TriageRecommendationAction;
+  /** Why this action was recommended */
+  reason: string;
+  /** Detailed guidance for the triager */
+  note: string;
+  /** Questions to send to the reporter to verify legitimacy (1-4 questions based on detected issues) */
+  challengeQuestions: ChallengeQuestion[];
+  /** Behavioral signals based on CVE publication timing */
+  temporalSignals: TemporalSignal[];
+  /** Template reuse detection result. Null when no template match found. */
+  templateMatch?: TemplateMatch | null;
+  /** Revision tracking result — detected when a report is a revision of a recent submission. Null when not a revision. */
+  revision?: RevisionResult | null;
+}
+
 export interface ReportAnalysis {
   id: number;
   /** Secret token for deleting this report. Only returned on initial submission. Store it — it cannot be recovered. */
@@ -249,6 +330,8 @@ export interface ReportAnalysis {
   llmEnhanced: boolean;
   /** Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed. */
   verification?: Verification | null;
+  /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
+  triageRecommendation?: TriageRecommendation | null;
   /** @nullable */
   fileName?: string | null;
   fileSize: number;
@@ -332,6 +415,8 @@ export interface CheckResult {
   llmEnhanced: boolean;
   /** Active content verification results. Null when verification was not performed. */
   verification?: Verification | null;
+  /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
+  triageRecommendation?: TriageRecommendation | null;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;
   /**

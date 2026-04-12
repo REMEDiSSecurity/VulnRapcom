@@ -15,6 +15,7 @@ import type { ReportAnalysisSensitivityProfile } from "./reportAnalysisSensitivi
 import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
+import type { TriageRecommendation } from "./triageRecommendation";
 import type { Verification } from "./verification";
 
 export interface ReportAnalysis {
@@ -78,6 +79,8 @@ export interface ReportAnalysis {
   llmEnhanced: boolean;
   /** Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed. */
   verification?: Verification | null;
+  /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
+  triageRecommendation?: TriageRecommendation | null;
   /** @nullable */
   fileName?: string | null;
   fileSize: number;

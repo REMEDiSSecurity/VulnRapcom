@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { registerCvePublicationDate } from "./triage-recommendation";
 
 export interface VerificationCheck {
   type: string;
@@ -366,13 +367,14 @@ const CVE_ID_RE = /CVE-(\d{4})-(\d{4,})/g;
 interface NvdVulnerability {
   cve?: {
     id?: string;
+    published?: string;
     descriptions?: Array<{ lang?: string; value?: string }>;
   };
 }
 
-async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: string; error?: boolean }> {
+async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: string; published?: string; error?: boolean }> {
   const cacheKey = "nvd:" + cveId;
-  const cached = cacheGet<{ found: boolean; description?: string; error?: boolean }>(cacheKey);
+  const cached = cacheGet<{ found: boolean; description?: string; published?: string; error?: boolean }>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -403,7 +405,8 @@ async function nvdFetch(cveId: string): Promise<{ found: boolean; description?: 
     }
 
     const desc = vulns[0]?.cve?.descriptions?.find((d) => d.lang === "en")?.value ?? "";
-    const result = { found: true, description: desc };
+    const published = vulns[0]?.cve?.published ?? undefined;
+    const result = { found: true, description: desc, published };
     cacheSet(cacheKey, result);
     return result;
   } catch {
@@ -486,6 +489,9 @@ async function verifyCveReferences(text: string): Promise<VerificationCheck[]> {
         weight: 20,
       });
     } else {
+      if (nvdResult.published) {
+        registerCvePublicationDate(cveId, nvdResult.published);
+      }
       const similarity = nvdResult.description ? computePhraseSimilarity(text, nvdResult.description) : 0;
 
       if (similarity > 30) {

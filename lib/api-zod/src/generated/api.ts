@@ -300,6 +300,95 @@ export const GetReportResponse = zod.object({
     .describe(
       "Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed.",
     ),
+  triageRecommendation: zod
+    .union([
+      zod.object({
+        action: zod
+          .enum([
+            "AUTO_CLOSE",
+            "MANUAL_REVIEW",
+            "CHALLENGE_REPORTER",
+            "PRIORITIZE",
+            "STANDARD_TRIAGE",
+          ])
+          .describe(
+            "Recommended triage action based on score, confidence, and verification results",
+          ),
+        reason: zod.string().describe("Why this action was recommended"),
+        note: zod.string().describe("Detailed guidance for the triager"),
+        challengeQuestions: zod
+          .array(
+            zod.object({
+              category: zod
+                .string()
+                .describe(
+                  "Question category (missing_file, missing_function, nvd_plagiarism, invalid_cve, placeholder_poc, severity_inflation, fabricated_output)",
+                ),
+              question: zod
+                .string()
+                .describe("The question to send to the reporter"),
+              context: zod
+                .string()
+                .describe("Context about why this question was generated"),
+            }),
+          )
+          .describe(
+            "Questions to send to the reporter to verify legitimacy (1-4 questions based on detected issues)",
+          ),
+        temporalSignals: zod
+          .array(
+            zod.object({
+              cveId: zod.string(),
+              publishedDate: zod.coerce.date(),
+              hoursSincePublication: zod.number(),
+              signal: zod.enum([
+                "suspiciously_fast",
+                "fast_turnaround",
+                "normal",
+              ]),
+              weight: zod.number(),
+            }),
+          )
+          .describe("Behavioral signals based on CVE publication timing"),
+        templateMatch: zod
+          .union([
+            zod.object({
+              templateHash: zod.string(),
+              matchedReportIds: zod.array(zod.number()),
+              weight: zod.number(),
+            }),
+            zod.null(),
+          ])
+          .optional()
+          .describe(
+            "Template reuse detection result. Null when no template match found.",
+          ),
+        revision: zod
+          .union([
+            zod.object({
+              originalReportId: zod.number(),
+              originalScore: zod.number(),
+              similarity: zod.number(),
+              scoreChange: zod
+                .number()
+                .describe(
+                  "Score change from original (negative = improved, positive = worsened)",
+                ),
+              direction: zod.enum(["improved", "worsened", "unchanged"]),
+            }),
+            zod.null(),
+          ])
+          .optional()
+          .describe(
+            "Revision tracking result — detected when a report is a revision of a recent submission. Null when not a revision.",
+          ),
+      }),
+      zod.null(),
+    ])
+    .optional()
+    .describe(
+      "Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.",
+    ),
   fileName: zod.string().nullish(),
   fileSize: zod.number(),
   createdAt: zod.coerce.date(),
@@ -411,6 +500,14 @@ export const CompareReportsResponse = zod.object({
   totalSections: zod
     .number()
     .describe("Total unique sections across both reports"),
+});
+
+/**
+ * Returns a formatted markdown summary with score, verification results, evidence, recommendation, and challenge questions — ready to paste into Jira/ServiceNow
+ * @summary Get exportable markdown triage report
+ */
+export const GetTriageReportParams = zod.object({
+  id: zod.coerce.number(),
 });
 
 /**
@@ -622,6 +719,95 @@ export const CheckReportResponse = zod.object({
     .optional()
     .describe(
       "Active content verification results. Null when verification was not performed.",
+    ),
+  triageRecommendation: zod
+    .union([
+      zod.object({
+        action: zod
+          .enum([
+            "AUTO_CLOSE",
+            "MANUAL_REVIEW",
+            "CHALLENGE_REPORTER",
+            "PRIORITIZE",
+            "STANDARD_TRIAGE",
+          ])
+          .describe(
+            "Recommended triage action based on score, confidence, and verification results",
+          ),
+        reason: zod.string().describe("Why this action was recommended"),
+        note: zod.string().describe("Detailed guidance for the triager"),
+        challengeQuestions: zod
+          .array(
+            zod.object({
+              category: zod
+                .string()
+                .describe(
+                  "Question category (missing_file, missing_function, nvd_plagiarism, invalid_cve, placeholder_poc, severity_inflation, fabricated_output)",
+                ),
+              question: zod
+                .string()
+                .describe("The question to send to the reporter"),
+              context: zod
+                .string()
+                .describe("Context about why this question was generated"),
+            }),
+          )
+          .describe(
+            "Questions to send to the reporter to verify legitimacy (1-4 questions based on detected issues)",
+          ),
+        temporalSignals: zod
+          .array(
+            zod.object({
+              cveId: zod.string(),
+              publishedDate: zod.coerce.date(),
+              hoursSincePublication: zod.number(),
+              signal: zod.enum([
+                "suspiciously_fast",
+                "fast_turnaround",
+                "normal",
+              ]),
+              weight: zod.number(),
+            }),
+          )
+          .describe("Behavioral signals based on CVE publication timing"),
+        templateMatch: zod
+          .union([
+            zod.object({
+              templateHash: zod.string(),
+              matchedReportIds: zod.array(zod.number()),
+              weight: zod.number(),
+            }),
+            zod.null(),
+          ])
+          .optional()
+          .describe(
+            "Template reuse detection result. Null when no template match found.",
+          ),
+        revision: zod
+          .union([
+            zod.object({
+              originalReportId: zod.number(),
+              originalScore: zod.number(),
+              similarity: zod.number(),
+              scoreChange: zod
+                .number()
+                .describe(
+                  "Score change from original (negative = improved, positive = worsened)",
+                ),
+              direction: zod.enum(["improved", "worsened", "unchanged"]),
+            }),
+            zod.null(),
+          ])
+          .optional()
+          .describe(
+            "Revision tracking result — detected when a report is a revision of a recent submission. Null when not a revision.",
+          ),
+      }),
+      zod.null(),
+    ])
+    .optional()
+    .describe(
+      "Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed.",
     ),
   previouslySubmitted: zod
     .boolean()
