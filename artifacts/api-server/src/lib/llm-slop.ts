@@ -207,17 +207,3 @@ function clamp(val: number): number {
   return Math.min(100, Math.max(0, Math.round(Number(val) || 0)));
 }
 
-export function blendSlopScores(
-  heuristicScore: number,
-  llmScore: number
-): number {
-  return Math.min(100, Math.max(0, Math.round(heuristicScore * 0.4 + llmScore * 0.6)));
-}
-
-export function getSlopTier(score: number): string {
-  if (score >= 70) return "Pure Slop";
-  if (score >= 50) return "Highly Suspicious";
-  if (score >= 30) return "Questionable";
-  if (score >= 15) return "Mildly Suspicious";
-  return "Probably Legit";
-}
