@@ -7,6 +7,7 @@
  */
 import type { CheckResultLlmBreakdown } from "./checkResultLlmBreakdown";
 import type { CheckResultSectionHashes } from "./checkResultSectionHashes";
+import type { CheckResultSensitivityProfile } from "./checkResultSensitivityProfile";
 import type { EvidenceItem } from "./evidenceItem";
 import type { HumanIndicator } from "./humanIndicator";
 import type { RedactionSummary } from "./redactionSummary";
@@ -37,6 +38,16 @@ export interface CheckResult {
   llmBreakdown?: CheckResultLlmBreakdown;
   /** Detected human-writing signals that reduced the slop score */
   humanIndicators?: HumanIndicator[];
+  /**
+   * Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied.
+   * @nullable
+   */
+  adjustedScore?: number | null;
+  /**
+   * Active sensitivity preset used for score adjustment. Null when default.
+   * @nullable
+   */
+  sensitivityProfile?: CheckResultSensitivityProfile;
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;

@@ -78,6 +78,20 @@ export type ReportAnalysisLlmBreakdown = {
   hallucination?: number;
 } | null;
 
+/**
+ * Active sensitivity preset used for score adjustment. Null when default (balanced).
+ * @nullable
+ */
+export type ReportAnalysisSensitivityProfile =
+  | (typeof ReportAnalysisSensitivityProfile)[keyof typeof ReportAnalysisSensitivityProfile]
+  | null;
+
+export const ReportAnalysisSensitivityProfile = {
+  lenient: "lenient",
+  balanced: "balanced",
+  strict: "strict",
+} as const;
+
 export interface ScoreBreakdown {
   /** Linguistic AI fingerprinting score (0-100) */
   linguistic: number;
@@ -169,6 +183,16 @@ export interface ReportAnalysis {
   llmBreakdown?: ReportAnalysisLlmBreakdown;
   /** Detected human-writing signals that reduced the slop score */
   humanIndicators?: HumanIndicator[];
+  /**
+   * Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied (balanced preset).
+   * @nullable
+   */
+  adjustedScore?: number | null;
+  /**
+   * Active sensitivity preset used for score adjustment. Null when default (balanced).
+   * @nullable
+   */
+  sensitivityProfile?: ReportAnalysisSensitivityProfile;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */
@@ -204,6 +228,20 @@ export type CheckResultLlmBreakdown = {
   hallucination?: number;
 } | null;
 
+/**
+ * Active sensitivity preset used for score adjustment. Null when default.
+ * @nullable
+ */
+export type CheckResultSensitivityProfile =
+  | (typeof CheckResultSensitivityProfile)[keyof typeof CheckResultSensitivityProfile]
+  | null;
+
+export const CheckResultSensitivityProfile = {
+  lenient: "lenient",
+  balanced: "balanced",
+  strict: "strict",
+} as const;
+
 export interface CheckResult {
   slopScore: number;
   slopTier: string;
@@ -227,6 +265,16 @@ export interface CheckResult {
   llmBreakdown?: CheckResultLlmBreakdown;
   /** Detected human-writing signals that reduced the slop score */
   humanIndicators?: HumanIndicator[];
+  /**
+   * Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied.
+   * @nullable
+   */
+  adjustedScore?: number | null;
+  /**
+   * Active sensitivity preset used for score adjustment. Null when default.
+   * @nullable
+   */
+  sensitivityProfile?: CheckResultSensitivityProfile;
   llmEnhanced: boolean;
   /** Whether this exact report was found in the database */
   previouslySubmitted: boolean;

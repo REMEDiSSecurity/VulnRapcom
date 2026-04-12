@@ -11,6 +11,7 @@ import type { RedactionSummary } from "./redactionSummary";
 import type { ReportAnalysisContentMode } from "./reportAnalysisContentMode";
 import type { ReportAnalysisLlmBreakdown } from "./reportAnalysisLlmBreakdown";
 import type { ReportAnalysisSectionHashes } from "./reportAnalysisSectionHashes";
+import type { ReportAnalysisSensitivityProfile } from "./reportAnalysisSensitivityProfile";
 import type { ScoreBreakdown } from "./scoreBreakdown";
 import type { SectionMatchItem } from "./sectionMatchItem";
 import type { SimilarityMatch } from "./similarityMatch";
@@ -62,6 +63,16 @@ export interface ReportAnalysis {
   llmBreakdown?: ReportAnalysisLlmBreakdown;
   /** Detected human-writing signals that reduced the slop score */
   humanIndicators?: HumanIndicator[];
+  /**
+   * Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied (balanced preset).
+   * @nullable
+   */
+  adjustedScore?: number | null;
+  /**
+   * Active sensitivity preset used for score adjustment. Null when default (balanced).
+   * @nullable
+   */
+  sensitivityProfile?: ReportAnalysisSensitivityProfile;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
   /** @nullable */

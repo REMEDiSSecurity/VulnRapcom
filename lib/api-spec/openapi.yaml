@@ -528,6 +528,13 @@ components:
           items:
             $ref: "#/components/schemas/HumanIndicator"
           description: Detected human-writing signals that reduced the slop score
+        adjustedScore:
+          type: ["integer", "null"]
+          description: Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied (balanced preset).
+        sensitivityProfile:
+          type: ["string", "null"]
+          enum: ["lenient", "balanced", "strict", null]
+          description: Active sensitivity preset used for score adjustment. Null when default (balanced).
         llmEnhanced:
           type: boolean
           description: True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic.
@@ -655,6 +662,13 @@ components:
           items:
             $ref: "#/components/schemas/HumanIndicator"
           description: Detected human-writing signals that reduced the slop score
+        adjustedScore:
+          type: ["integer", "null"]
+          description: Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied.
+        sensitivityProfile:
+          type: ["string", "null"]
+          enum: ["lenient", "balanced", "strict", null]
+          description: Active sensitivity preset used for score adjustment. Null when default.
         llmEnhanced:
           type: boolean
         previouslySubmitted:

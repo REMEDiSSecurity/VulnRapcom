@@ -206,6 +206,23 @@ export const GetReportResponse = zod.object({
     )
     .optional()
     .describe("Detected human-writing signals that reduced the slop score"),
+  adjustedScore: zod
+    .number()
+    .nullish()
+    .describe(
+      "Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied (balanced preset).",
+    ),
+  sensitivityProfile: zod
+    .union([
+      zod.literal("lenient"),
+      zod.literal("balanced"),
+      zod.literal("strict"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe(
+      "Active sensitivity preset used for score adjustment. Null when default (balanced).",
+    ),
   llmEnhanced: zod
     .boolean()
     .describe(
@@ -444,6 +461,23 @@ export const CheckReportResponse = zod.object({
     )
     .optional()
     .describe("Detected human-writing signals that reduced the slop score"),
+  adjustedScore: zod
+    .number()
+    .nullish()
+    .describe(
+      "Client-adjusted slop score based on sensitivity profile. Null when no adjustment applied.",
+    ),
+  sensitivityProfile: zod
+    .union([
+      zod.literal("lenient"),
+      zod.literal("balanced"),
+      zod.literal("strict"),
+      zod.literal(null),
+    ])
+    .nullish()
+    .describe(
+      "Active sensitivity preset used for score adjustment. Null when default.",
+    ),
   llmEnhanced: zod.boolean(),
   previouslySubmitted: zod
     .boolean()

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn, anonymizeId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { getSettings, getSlopColorCustom, getSlopProgressColorCustom } from "@/lib/settings";
 import logoSrc from "@/assets/logo.png";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -19,15 +20,13 @@ const MAX_TEXT_LENGTH = 20 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".txt", ".md", ".pdf"];
 
 function getSlopColor(score: number) {
-  if (score < 30) return "text-green-500";
-  if (score < 70) return "text-yellow-500";
-  return "text-destructive";
+  const s = getSettings();
+  return getSlopColorCustom(score, s.slopThresholdLow, s.slopThresholdHigh);
 }
 
 function getSlopProgressColor(score: number) {
-  if (score < 30) return "bg-green-500";
-  if (score < 70) return "bg-yellow-500";
-  return "bg-destructive";
+  const s = getSettings();
+  return getSlopProgressColorCustom(score, s.slopThresholdLow, s.slopThresholdHigh);
 }
 
 function timeAgo(date: string): string {
