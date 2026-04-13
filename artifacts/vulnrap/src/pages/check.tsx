@@ -486,11 +486,12 @@ export default function Check() {
               Analysis Options
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+              <label className={`flex items-start gap-3 p-3 rounded-lg border border-border transition-colors ${skipRedaction ? "opacity-60 cursor-not-allowed" : "hover:border-primary/30 cursor-pointer"} group`}>
                 <input
                   type="checkbox"
                   checked={skipLlm}
                   onChange={(e) => setSkipLlm(e.target.checked)}
+                  disabled={skipRedaction}
                   className="rounded border-border accent-primary w-4 h-4 mt-0.5"
                   data-testid="toggle-skip-llm"
                 />
@@ -500,7 +501,9 @@ export default function Check() {
                     Skip AI analysis
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Heuristic and statistical scoring only. No data sent to any external AI provider.
+                    {skipRedaction
+                      ? "Locked on — AI analysis is disabled when PII redaction is off."
+                      : "Heuristic and statistical scoring only. No data sent to any external AI provider."}
                   </p>
                 </div>
               </label>
