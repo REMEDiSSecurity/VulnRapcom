@@ -81,7 +81,7 @@ export function BlogBuildingVulnrap() {
         </P>
 
         <P>
-          VulnRap was built to solve this. Not by replacing human judgment, but by giving PSIRT teams a way to score, verify, and triage incoming vulnerability reports before burning hours on reports that turn out to be hallucinated nonsense. We've been through four major development sprints since launch, and this post is a detailed walkthrough of what we built, what we learned, what works, and what's coming next.
+          VulnRap was built to help tackle this. Not by replacing human judgment, but by giving PSIRT teams a way to score, verify, and triage incoming vulnerability reports before burning hours on reports that turn out to be hallucinated nonsense. We've been through four major development sprints since launch, and this post is a detailed walkthrough of what we built, what we learned, what works, and what's coming next.
         </P>
 
         <Separator className="bg-border/50 my-6" />
@@ -110,7 +110,7 @@ export function BlogBuildingVulnrap() {
         </P>
 
         <P>
-          It started with minutes of thinking &mdash; scribbling out "what if I just pattern-match the obvious AI phrases?" Then hours of trying things, testing against real slop from our queue, watching the detection rate climb from useless to interesting. Every time I solved one detection problem, I'd find two more. "OK, I can catch AI phrases &mdash; but what about the slop that doesn't use AI phrases?" That led to statistical text analysis. "OK, I can detect abnormal sentence uniformity &mdash; but what about the slop that references real code?" That led to factual verification via GitHub API. "OK, I can check if functions exist &mdash; but what about the slop that references real functions but describes fake vulnerabilities?" That led to the LLM semantic analysis layer.
+          It started with minutes of thinking &mdash; scribbling out "what if I just pattern-match the obvious AI phrases?" Then hours of trying things, testing against real slop from our queue, watching the detection rate climb from useless to interesting. Every time I addressed one detection problem, I'd find two more. "OK, I can catch AI phrases &mdash; but what about the slop that doesn't use AI phrases?" That led to statistical text analysis. "OK, I can detect abnormal sentence uniformity &mdash; but what about the slop that references real code?" That led to factual verification via GitHub API. "OK, I can check if functions exist &mdash; but what about the slop that references real functions but describes fake vulnerabilities?" That led to the LLM semantic analysis layer.
         </P>
 
         <P>

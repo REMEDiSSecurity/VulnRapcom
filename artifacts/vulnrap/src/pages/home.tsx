@@ -527,17 +527,32 @@ function VideoSection() {
         <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="mt-2 rounded-xl glass-card-accent overflow-hidden">
-          <video
-            className="w-full"
-            controls
-            playsInline
-            autoPlay
-            preload="metadata"
-          >
-            <source src={`${import.meta.env.BASE_URL}vulnrap-intro.mp4`} type="video/mp4" />
-            Your browser does not support video playback.
-          </video>
+        <div className="mt-2 space-y-2">
+          <div className="rounded-xl glass-card-accent overflow-hidden">
+            <video
+              className="w-full"
+              controls
+              playsInline
+              autoPlay
+              preload="metadata"
+            >
+              <source src={`${import.meta.env.BASE_URL}vulnrap-rap-sheet.mov`} type="video/quicktime" />
+              <source src={`${import.meta.env.BASE_URL}vulnrap-rap-sheet.mov`} type="video/mp4" />
+              Your browser does not support video playback.
+            </video>
+          </div>
+          <p className="text-center text-[10px] text-muted-foreground/50">
+            Looking for our{" "}
+            <a
+              href={`${import.meta.env.BASE_URL}vulnrap-intro.mp4`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary/60 hover:text-primary hover:underline transition-colors"
+            >
+              previous rap video
+            </a>
+            ?
+          </p>
         </div>
       )}
     </div>

@@ -19,7 +19,7 @@ function FirstPost() {
           We Built the Tool We Wished Existed
         </h2>
         <p className="text-muted-foreground leading-relaxed">
-          Why we created VulnRap, what problem it actually solves, and why you should feel comfortable using it.
+          Why we created VulnRap, how it helps with triage, and why you should feel comfortable using it.
         </p>
       </div>
 
