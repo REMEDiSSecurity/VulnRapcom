@@ -78,6 +78,10 @@ export interface ReportAnalysis {
   sensitivityProfile?: ReportAnalysisSensitivityProfile;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
+  /** Whether LLM analysis was attempted (not skipped by user). When false, the user explicitly opted out of AI analysis. */
+  llmUsed?: boolean;
+  /** Whether PII auto-redaction was applied. When false, the user explicitly disabled redaction. */
+  redactionApplied?: boolean;
   /** Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed. */
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */

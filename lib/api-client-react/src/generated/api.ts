@@ -148,6 +148,12 @@ export const submitReport = async (
   if (submitReportBody.showInFeed !== undefined) {
     formData.append(`showInFeed`, submitReportBody.showInFeed);
   }
+  if (submitReportBody.skipLlm !== undefined) {
+    formData.append(`skipLlm`, submitReportBody.skipLlm);
+  }
+  if (submitReportBody.skipRedaction !== undefined) {
+    formData.append(`skipRedaction`, submitReportBody.skipRedaction);
+  }
 
   return customFetch<ReportAnalysis>(getSubmitReportUrl(), {
     ...options,
@@ -686,6 +692,12 @@ export const checkReport = async (
   }
   if (checkReportBody.reportUrl !== undefined) {
     formData.append(`reportUrl`, checkReportBody.reportUrl);
+  }
+  if (checkReportBody.skipLlm !== undefined) {
+    formData.append(`skipLlm`, checkReportBody.skipLlm);
+  }
+  if (checkReportBody.skipRedaction !== undefined) {
+    formData.append(`skipRedaction`, checkReportBody.skipRedaction);
   }
 
   return customFetch<CheckResult>(getCheckReportUrl(), {

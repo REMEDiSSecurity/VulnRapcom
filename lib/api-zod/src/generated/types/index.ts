@@ -8,6 +8,8 @@
 
 export * from "./challengeQuestion";
 export * from "./checkReportBody";
+export * from "./checkReportBodySkipLlm";
+export * from "./checkReportBodySkipRedaction";
 export * from "./checkResult";
 export * from "./checkResultLlmBreakdown";
 export * from "./checkResultSectionHashes";
@@ -66,6 +68,8 @@ export * from "./submitFeedbackBody";
 export * from "./submitReportBody";
 export * from "./submitReportBodyContentMode";
 export * from "./submitReportBodyShowInFeed";
+export * from "./submitReportBodySkipLlm";
+export * from "./submitReportBodySkipRedaction";
 export * from "./templateMatch";
 export * from "./temporalSignal";
 export * from "./temporalSignalSignal";

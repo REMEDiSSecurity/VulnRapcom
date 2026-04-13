@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp, Leaf, MessageSquareWarning, Copy, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck } from "lucide-react";
+import { UploadCloud, Shield, Loader2, CheckCircle, XCircle, Search, AlertTriangle, ClipboardPaste, Hash, Layers, Lightbulb, ShieldCheck, HelpCircle, ExternalLink, Link2, BarChart3, Target, Brain, Cpu, FileText, Eye, Gauge, AlertCircle, ChevronDown, ChevronUp, Leaf, MessageSquareWarning, Copy, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck, BrainCircuit, ShieldOff, Zap } from "lucide-react";
 import { useCheckReport, type Verification, type VerificationCheck, type VerificationSummary, type TriageRecommendation, type ChallengeQuestion, type TemporalSignal, type TemplateMatch, type RevisionResult, type CheckReportBody, type TriageAssistant, type GapItem } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -240,6 +240,8 @@ interface CheckResultData {
   humanIndicators?: Array<{ type: string; description: string; weight: number; matched?: string | null }>;
   llmBreakdown?: { specificity?: number; originality?: number; voice?: number; coherence?: number; hallucination?: number };
   llmEnhanced?: boolean;
+  llmUsed?: boolean;
+  redactionApplied?: boolean;
   similarityMatches: Array<{ reportId: number; similarity: number; matchType: string }>;
   sectionHashes: Record<string, string>;
   sectionMatches: Array<{ sectionTitle: string; matchedReportId: number; matchedSectionTitle: string; similarity: number }>;
@@ -260,6 +262,8 @@ export default function Check() {
   const [reportUrl, setReportUrl] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [skipLlm, setSkipLlm] = useState(false);
+  const [skipRedaction, setSkipRedaction] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<CheckResultData | null>(null);
   const [showAllEvidence, setShowAllEvidence] = useState(false);
@@ -311,7 +315,7 @@ export default function Check() {
       }
       const error = validateFile(file);
       if (error) { setFileError(error); return; }
-      checkMutation.mutate({ data: { file } });
+      checkMutation.mutate({ data: { file, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } });
     } else if (inputMode === "link") {
       const trimmedUrl = reportUrl.trim();
       if (!trimmedUrl) {
@@ -322,14 +326,14 @@ export default function Check() {
         toast({ title: "Invalid URL", description: "Please enter a valid HTTPS URL.", variant: "destructive" });
         return;
       }
-      checkMutation.mutate({ data: { reportUrl: trimmedUrl } as CheckReportBody });
+      checkMutation.mutate({ data: { reportUrl: trimmedUrl, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } as CheckReportBody });
     } else {
       const trimmed = rawText.trim();
       if (!trimmed) {
         toast({ title: "No text", description: "Please paste report text first.", variant: "destructive" });
         return;
       }
-      checkMutation.mutate({ data: { rawText: trimmed } });
+      checkMutation.mutate({ data: { rawText: trimmed, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } });
     }
   };
 
@@ -476,6 +480,58 @@ export default function Check() {
               {fileError && <span className="text-xs text-destructive">{fileError}</span>}
             </div>
           )}
+          <div className="space-y-3 px-4 sm:px-6 pb-2">
+            <h3 className="font-medium flex items-center gap-2 text-sm">
+              <Zap className="w-4 h-4 text-primary" />
+              Analysis Options
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={skipLlm}
+                  onChange={(e) => setSkipLlm(e.target.checked)}
+                  className="rounded border-border accent-primary w-4 h-4 mt-0.5"
+                  data-testid="toggle-skip-llm"
+                />
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                    <BrainCircuit className="w-3.5 h-3.5" />
+                    Skip AI analysis
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Heuristic and statistical scoring only. No data sent to any external AI provider.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={skipRedaction}
+                  onChange={(e) => { setSkipRedaction(e.target.checked); if (e.target.checked) setSkipLlm(true); }}
+                  className="rounded border-border accent-primary w-4 h-4 mt-0.5"
+                  data-testid="toggle-skip-redaction"
+                />
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                    <ShieldOff className="w-3.5 h-3.5" />
+                    Disable PII redaction
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Skip PII auto-redaction. AI analysis is automatically disabled when redaction is off.
+                  </p>
+                </div>
+              </label>
+            </div>
+            {skipRedaction && (
+              <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <AlertTriangle className="w-3.5 h-3.5 text-orange-500 mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] text-orange-300 leading-relaxed">
+                  <strong>Warning:</strong> PII, secrets, and company names in your report will <strong>not</strong> be removed.
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
         <CardFooter>
           <Button
@@ -501,6 +557,27 @@ export default function Check() {
             Check Results
             <Badge variant="outline" className="text-[10px] sm:text-xs">Not stored</Badge>
           </h2>
+
+          {(result.llmUsed === false || result.redactionApplied === false) && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              {result.llmUsed === false && (
+                <div className="flex-1 rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 flex items-center gap-2">
+                  <BrainCircuit className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                  <p className="text-xs text-violet-300">
+                    <strong>Analysis: heuristic only</strong> — AI analysis was disabled.
+                  </p>
+                </div>
+              )}
+              {result.redactionApplied === false && (
+                <div className="flex-1 rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2 flex items-center gap-2">
+                  <ShieldOff className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <p className="text-xs text-orange-300">
+                    <strong>PII redaction was disabled</strong> — report text was not sanitized.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {result.previouslySubmitted && (
             <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 glass-card">

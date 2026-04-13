@@ -448,6 +448,10 @@ export interface ReportAnalysis {
   sensitivityProfile?: ReportAnalysisSensitivityProfile;
   /** True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic. */
   llmEnhanced: boolean;
+  /** Whether LLM analysis was attempted (not skipped by user). When false, the user explicitly opted out of AI analysis. */
+  llmUsed?: boolean;
+  /** Whether PII auto-redaction was applied. When false, the user explicitly disabled redaction. */
+  redactionApplied?: boolean;
   /** Active content verification results (GitHub, NVD, PoC checks). Null when verification was not performed. */
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
@@ -535,6 +539,10 @@ export interface CheckResult {
    */
   sensitivityProfile?: CheckResultSensitivityProfile;
   llmEnhanced: boolean;
+  /** Whether LLM analysis was attempted (not skipped by user). */
+  llmUsed?: boolean;
+  /** Whether PII auto-redaction was applied. */
+  redactionApplied?: boolean;
   /** Active content verification results. Null when verification was not performed. */
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */
@@ -730,6 +738,28 @@ export const SubmitReportBodyShowInFeed = {
   false: "false",
 } as const;
 
+/**
+ * Skip LLM analysis — use only local heuristic/statistical scoring
+ */
+export type SubmitReportBodySkipLlm =
+  (typeof SubmitReportBodySkipLlm)[keyof typeof SubmitReportBodySkipLlm];
+
+export const SubmitReportBodySkipLlm = {
+  true: "true",
+  false: "false",
+} as const;
+
+/**
+ * Skip PII auto-redaction. Only use for known slop or local deployments.
+ */
+export type SubmitReportBodySkipRedaction =
+  (typeof SubmitReportBodySkipRedaction)[keyof typeof SubmitReportBodySkipRedaction];
+
+export const SubmitReportBodySkipRedaction = {
+  true: "true",
+  false: "false",
+} as const;
+
 export type SubmitReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf). Either file or rawText must be provided. */
   file?: Blob;
@@ -741,7 +771,33 @@ export type SubmitReportBody = {
   contentMode: SubmitReportBodyContentMode;
   /** Whether to show this report in the public recent reports feed */
   showInFeed?: SubmitReportBodyShowInFeed;
+  /** Skip LLM analysis — use only local heuristic/statistical scoring */
+  skipLlm?: SubmitReportBodySkipLlm;
+  /** Skip PII auto-redaction. Only use for known slop or local deployments. */
+  skipRedaction?: SubmitReportBodySkipRedaction;
 };
+
+/**
+ * Skip LLM analysis — use only local heuristic/statistical scoring
+ */
+export type CheckReportBodySkipLlm =
+  (typeof CheckReportBodySkipLlm)[keyof typeof CheckReportBodySkipLlm];
+
+export const CheckReportBodySkipLlm = {
+  true: "true",
+  false: "false",
+} as const;
+
+/**
+ * Skip PII auto-redaction. Only use for known slop or local deployments.
+ */
+export type CheckReportBodySkipRedaction =
+  (typeof CheckReportBodySkipRedaction)[keyof typeof CheckReportBodySkipRedaction];
+
+export const CheckReportBodySkipRedaction = {
+  true: "true",
+  false: "false",
+} as const;
 
 export type CheckReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf) */
@@ -750,6 +806,10 @@ export type CheckReportBody = {
   rawText?: string;
   /** HTTPS URL to a plain-text report (GitHub raw, Gist, GitLab, Pastebin, etc.). Auto-converts GitHub blob URLs to raw. Max 5MB. */
   reportUrl?: string;
+  /** Skip LLM analysis — use only local heuristic/statistical scoring */
+  skipLlm?: CheckReportBodySkipLlm;
+  /** Skip PII auto-redaction. Only use for known slop or local deployments. */
+  skipRedaction?: CheckReportBodySkipRedaction;
 };
 
 export type GetReportFeedParams = {

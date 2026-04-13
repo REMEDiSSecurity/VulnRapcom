@@ -52,6 +52,10 @@ export interface CheckResult {
    */
   sensitivityProfile?: CheckResultSensitivityProfile;
   llmEnhanced: boolean;
+  /** Whether LLM analysis was attempted (not skipped by user). */
+  llmUsed?: boolean;
+  /** Whether PII auto-redaction was applied. */
+  redactionApplied?: boolean;
   /** Active content verification results. Null when verification was not performed. */
   verification?: Verification | null;
   /** Automated triage action recommendation with challenge questions and behavioral signals. Null when not computed. */

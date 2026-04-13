@@ -35,7 +35,7 @@ The project is structured as a pnpm workspace monorepo using TypeScript, with di
 - Employs a Cyberpunk glassmorphism design system with glass cards, glow effects, gradient elements, and animated laser visuals.
 - Features route-level code splitting for performance.
 - Provides various user interfaces including:
-    - Home/Submit page with drag-and-drop upload and privacy mode selection.
+    - Home/Submit page with drag-and-drop upload, privacy mode selection, and Analysis Options toggles (Skip AI analysis, Disable PII redaction with auto-skip-AI guardrail).
     - Analysis Results page displaying dual scores (AI Likelihood + Report Quality), confidence gauge (semicircular SVG), per-axis breakdown (Linguistic/Factual/Template/LLM), LLM radar chart (5-dimension spider chart), evidence signals with weight badges, evidence-highlighted report text with inline citations, redaction summary, similarity matches, and section-level analysis.
     - Analysis progress stepper component showing pipeline stages (Upload → Redact → Linguistic → Factual → Template/Similarity → LLM/Scoring → Triage) during submission/check.
     - Batch Upload and Compare Two Reports functionalities.
@@ -48,7 +48,8 @@ The project is structured as a pnpm workspace monorepo using TypeScript, with di
 ### Backend (`artifacts/api-server/`)
 - **API Framework**: Express 5.
 - **Database**: PostgreSQL with Drizzle ORM.
-- **Auto-Redaction Engine**: Deterministic regex-based redaction of PII/secrets, applied before analysis or storage.
+- **Auto-Redaction Engine**: Deterministic regex-based redaction of PII/secrets, applied before analysis or storage. Can be toggled via `skipRedaction` parameter (forces `skipLlm=true` to prevent unredacted data from reaching external APIs).
+- **Analysis Options**: `skipLlm` and `skipRedaction` query params on POST `/reports` and `/reports/check`. Flags (`llmUsed`, `redactionApplied`) are persisted in the `breakdown` JSONB column and returned by GET `/reports/:id`.
 - **Section Parser**: Parses reports into logical sections, hashes them with SHA-256, and classifies their value.
 - **Similarity Engine**: Uses MinHash + Locality Sensitive Hashing (LSH), Simhash, and SHA-256 for near-duplicate and exact-match detection.
 - **Multi-Axis Scoring Engine (v3.0)**:

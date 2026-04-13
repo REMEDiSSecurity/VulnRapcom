@@ -21,6 +21,8 @@ export const HealthCheckResponse = zod.object({
  */
 export const submitReportBodyContentModeDefault = `full`;
 export const submitReportBodyShowInFeedDefault = `false`;
+export const submitReportBodySkipLlmDefault = `false`;
+export const submitReportBodySkipRedactionDefault = `false`;
 
 export const SubmitReportBody = zod.object({
   file: zod
@@ -51,6 +53,18 @@ export const SubmitReportBody = zod.object({
     .enum(["true", "false"])
     .default(submitReportBodyShowInFeedDefault)
     .describe("Whether to show this report in the public recent reports feed"),
+  skipLlm: zod
+    .enum(["true", "false"])
+    .default(submitReportBodySkipLlmDefault)
+    .describe(
+      "Skip LLM analysis — use only local heuristic\/statistical scoring",
+    ),
+  skipRedaction: zod
+    .enum(["true", "false"])
+    .default(submitReportBodySkipRedactionDefault)
+    .describe(
+      "Skip PII auto-redaction. Only use for known slop or local deployments.",
+    ),
 });
 
 /**
@@ -233,6 +247,18 @@ export const GetReportResponse = zod.object({
     .boolean()
     .describe(
       "True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic.",
+    ),
+  llmUsed: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether LLM analysis was attempted (not skipped by user). When false, the user explicitly opted out of AI analysis.",
+    ),
+  redactionApplied: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether PII auto-redaction was applied. When false, the user explicitly disabled redaction.",
     ),
   verification: zod
     .union([
@@ -612,6 +638,9 @@ export const GetTriageReportParams = zod.object({
  * For report receivers -- analyze a report for similarity and sloppiness without adding it to the database
  * @summary Check a report against the database without storing it
  */
+export const checkReportBodySkipLlmDefault = `false`;
+export const checkReportBodySkipRedactionDefault = `false`;
+
 export const CheckReportBody = zod.object({
   file: zod
     .instanceof(File)
@@ -626,6 +655,18 @@ export const CheckReportBody = zod.object({
     .optional()
     .describe(
       "HTTPS URL to a plain-text report (GitHub raw, Gist, GitLab, Pastebin, etc.). Auto-converts GitHub blob URLs to raw. Max 5MB.",
+    ),
+  skipLlm: zod
+    .enum(["true", "false"])
+    .default(checkReportBodySkipLlmDefault)
+    .describe(
+      "Skip LLM analysis — use only local heuristic\/statistical scoring",
+    ),
+  skipRedaction: zod
+    .enum(["true", "false"])
+    .default(checkReportBodySkipRedactionDefault)
+    .describe(
+      "Skip PII auto-redaction. Only use for known slop or local deployments.",
     ),
 });
 
@@ -752,6 +793,14 @@ export const CheckReportResponse = zod.object({
       "Active sensitivity preset used for score adjustment. Null when default.",
     ),
   llmEnhanced: zod.boolean(),
+  llmUsed: zod
+    .boolean()
+    .optional()
+    .describe("Whether LLM analysis was attempted (not skipped by user)."),
+  redactionApplied: zod
+    .boolean()
+    .optional()
+    .describe("Whether PII auto-redaction was applied."),
   verification: zod
     .union([
       zod.object({

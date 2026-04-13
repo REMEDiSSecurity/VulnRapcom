@@ -5,6 +5,8 @@
  * VulnRap.com API — Vulnerability Report Validation Platform
  * OpenAPI spec version: 3.0.0
  */
+import type { CheckReportBodySkipLlm } from "./checkReportBodySkipLlm";
+import type { CheckReportBodySkipRedaction } from "./checkReportBodySkipRedaction";
 
 export type CheckReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf) */
@@ -13,4 +15,8 @@ export type CheckReportBody = {
   rawText?: string;
   /** HTTPS URL to a plain-text report (GitHub raw, Gist, GitLab, Pastebin, etc.). Auto-converts GitHub blob URLs to raw. Max 5MB. */
   reportUrl?: string;
+  /** Skip LLM analysis — use only local heuristic/statistical scoring */
+  skipLlm?: CheckReportBodySkipLlm;
+  /** Skip PII auto-redaction. Only use for known slop or local deployments. */
+  skipRedaction?: CheckReportBodySkipRedaction;
 };

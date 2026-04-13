@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge, Leaf, Shield, MessageSquareWarning, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck } from "lucide-react";
+import { AlertCircle, CheckCircle, Copy, AlertTriangle, FileText, Clock, Search, HelpCircle, Lightbulb, ShieldCheck, Hash, Layers, Award, Trash2, Brain, Cpu, GitCompare, ChevronDown, ChevronUp, Download, BarChart3, Target, Eye, Gauge, Leaf, Shield, MessageSquareWarning, RefreshCw, Fingerprint, Timer, Crosshair, ListChecks, Microscope, UserCheck, BrainCircuit, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -1063,6 +1063,27 @@ export default function Results() {
               {deleteMutation.isPending ? "Deleting..." : "Yes, delete permanently"}
             </Button>
           </div>
+        </div>
+      )}
+
+      {(report.llmUsed === false || report.redactionApplied === false) && (
+        <div className="flex flex-col sm:flex-row gap-2">
+          {report.llmUsed === false && (
+            <div className="flex-1 rounded-lg bg-violet-500/10 border border-violet-500/30 px-3 py-2 flex items-center gap-2">
+              <BrainCircuit className="w-4 h-4 text-violet-400 flex-shrink-0" />
+              <p className="text-xs text-violet-300">
+                <strong>Analysis: heuristic only</strong> — AI analysis was disabled for this report. Scoring is based on local heuristic and statistical signals only.
+              </p>
+            </div>
+          )}
+          {report.redactionApplied === false && (
+            <div className="flex-1 rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2 flex items-center gap-2">
+              <ShieldOff className="w-4 h-4 text-orange-400 flex-shrink-0" />
+              <p className="text-xs text-orange-300">
+                <strong>PII redaction was disabled</strong> — report text was not sanitized for personally identifiable information before analysis.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

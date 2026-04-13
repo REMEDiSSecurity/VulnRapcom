@@ -50,7 +50,7 @@ interface AnalysisResult extends FusionResult {
   triageAssistant: TriageAssistantResult | null;
 }
 
-async function performAnalysis(originalText: string, redactedText: string): Promise<AnalysisResult> {
+async function performAnalysis(originalText: string, redactedText: string, opts?: { skipLlm?: boolean }): Promise<AnalysisResult> {
   const [heuristic, linguistic, factual, verification] = await Promise.all([
     Promise.resolve(analyzeSloppiness(originalText)),
     Promise.resolve(analyzeLinguistic(originalText)),
@@ -65,9 +65,10 @@ async function performAnalysis(originalText: string, redactedText: string): Prom
 
   let llmResult: LLMSlopResult | null = null;
   const llmAvailable = isLLMAvailable();
-  const callLlm = shouldCallLLM(preliminary.slopScore, preliminary.confidence);
+  const userSkippedLlm = opts?.skipLlm === true;
+  const callLlm = !userSkippedLlm && shouldCallLLM(preliminary.slopScore, preliminary.confidence);
   logger.info(
-    { preliminaryScore: preliminary.slopScore, confidence: preliminary.confidence, llmAvailable, callLlm },
+    { preliminaryScore: preliminary.slopScore, confidence: preliminary.confidence, llmAvailable, callLlm, userSkippedLlm },
     "LLM decision"
   );
   if (callLlm) {
@@ -286,6 +287,8 @@ router.post("/reports", async (req, res): Promise<void> => {
     ? req.body.contentMode
     : "full";
   const showInFeed = req.body.showInFeed === "true";
+  const skipRedaction = req.body.skipRedaction === "true";
+  const skipLlm = req.body.skipLlm === "true" || skipRedaction;
 
   let text: string;
   let safeFileName: string | null = null;
@@ -339,7 +342,10 @@ router.post("/reports", async (req, res): Promise<void> => {
     return;
   }
 
-  const { redactedText, summary: redactionSummary } = redactReport(text);
+  const redactionApplied = !skipRedaction;
+  const { redactedText, summary: redactionSummary } = skipRedaction
+    ? { redactedText: text, summary: { totalRedactions: 0, categories: {} } }
+    : redactReport(text);
 
   const analysisText = redactedText;
 
@@ -380,7 +386,8 @@ router.post("/reports", async (req, res): Promise<void> => {
     candidateReports as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
-  const analysisResult = await performAnalysis(text, redactedText);
+  const llmUsed = !skipLlm;
+  const analysisResult = await performAnalysis(text, redactedText, { skipLlm });
   const { llmResult } = analysisResult;
 
   const deleteToken = crypto.randomBytes(32).toString("hex");
@@ -474,7 +481,7 @@ router.post("/reports", async (req, res): Promise<void> => {
         slopTier: analysisResult.slopTier,
         qualityScore: analysisResult.qualityScore,
         confidence: analysisResult.confidence,
-        breakdown: analysisResult.breakdown,
+        breakdown: { ...analysisResult.breakdown, llmUsed, redactionApplied } as any,
         evidence: analysisResult.evidence,
         humanIndicators: analysisResult.humanIndicators,
         similarityMatches,
@@ -553,6 +560,8 @@ router.post("/reports", async (req, res): Promise<void> => {
     llmFeedback: report.llmFeedback ?? null,
     llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
+    llmUsed,
+    redactionApplied,
     verification: analysisResult.verification ?? null,
     triageRecommendation: analysisResult.triageRecommendation ?? null,
     triageAssistant: analysisResult.triageAssistant ?? null,
@@ -583,6 +592,9 @@ router.post("/reports/check", (req, res, next): void => {
 });
 
 router.post("/reports/check", async (req, res): Promise<void> => {
+  const skipRedaction = req.body.skipRedaction === "true";
+  const skipLlm = req.body.skipLlm === "true" || skipRedaction;
+
   let text: string;
   const rawText = typeof req.body.rawText === "string" ? req.body.rawText : "";
   const reportUrl = typeof req.body.reportUrl === "string" ? req.body.reportUrl.trim() : "";
@@ -626,7 +638,10 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     return;
   }
 
-  const { redactedText, summary: redactionSummary } = redactReport(text);
+  const redactionApplied = !skipRedaction;
+  const { redactedText, summary: redactionSummary } = skipRedaction
+    ? { redactedText: text, summary: { totalRedactions: 0, categories: {} } }
+    : redactReport(text);
   const analysisText = redactedText;
 
   const contentHash = computeContentHash(analysisText);
@@ -701,10 +716,12 @@ router.post("/reports/check", async (req, res): Promise<void> => {
       sectionMatches: cached.sectionMatches,
       redactionSummary: cached.redactionSummary,
       feedback: cached.feedback,
-      llmSlopScore: cached.llmSlopScore ?? null,
-      llmFeedback: cached.llmFeedback ?? null,
-      llmBreakdown: cached.llmBreakdown ?? null,
-      llmEnhanced: cached.llmSlopScore != null,
+      llmSlopScore: skipLlm ? null : (cached.llmSlopScore ?? null),
+      llmFeedback: skipLlm ? null : (cached.llmFeedback ?? null),
+      llmBreakdown: skipLlm ? null : (cached.llmBreakdown ?? null),
+      llmEnhanced: skipLlm ? false : (cached.llmSlopScore != null),
+      llmUsed: !skipLlm,
+      redactionApplied,
       verification: null,
       triageRecommendation: cachedTriageRecommendation,
       triageAssistant: cachedTriageAssistant,
@@ -748,7 +765,7 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     checkCandidates as Array<{ id: number; sectionHashes: Record<string, string> }>,
   );
 
-  const analysisResult = await performAnalysis(text, analysisText);
+  const analysisResult = await performAnalysis(text, analysisText, { skipLlm });
 
   const { llmResult: checkLlmResult } = analysisResult;
 
@@ -769,6 +786,8 @@ router.post("/reports/check", async (req, res): Promise<void> => {
     llmFeedback: checkLlmResult ? checkLlmResult.llmFeedback : null,
     llmBreakdown: checkLlmResult?.llmBreakdown ?? null,
     llmEnhanced: checkLlmResult != null,
+    llmUsed: !skipLlm,
+    redactionApplied,
     verification: analysisResult.verification ?? null,
     triageRecommendation: analysisResult.triageRecommendation ?? null,
     triageAssistant: analysisResult.triageAssistant ?? null,
@@ -1119,6 +1138,8 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     llmFeedback: report.llmFeedback ?? null,
     llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
+    llmUsed: (report.breakdown as unknown as Record<string, unknown>)?.llmUsed !== false,
+    redactionApplied: (report.breakdown as unknown as Record<string, unknown>)?.redactionApplied !== false,
     verification,
     triageRecommendation,
     triageAssistant,

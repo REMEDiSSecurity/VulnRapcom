@@ -7,6 +7,8 @@
  */
 import type { SubmitReportBodyContentMode } from "./submitReportBodyContentMode";
 import type { SubmitReportBodyShowInFeed } from "./submitReportBodyShowInFeed";
+import type { SubmitReportBodySkipLlm } from "./submitReportBodySkipLlm";
+import type { SubmitReportBodySkipRedaction } from "./submitReportBodySkipRedaction";
 
 export type SubmitReportBody = {
   /** The vulnerability report file (.txt, .md, .pdf). Either file or rawText must be provided. */
@@ -19,4 +21,8 @@ export type SubmitReportBody = {
   contentMode: SubmitReportBodyContentMode;
   /** Whether to show this report in the public recent reports feed */
   showInFeed?: SubmitReportBodyShowInFeed;
+  /** Skip LLM analysis — use only local heuristic/statistical scoring */
+  skipLlm?: SubmitReportBodySkipLlm;
+  /** Skip PII auto-redaction. Only use for known slop or local deployments. */
+  skipRedaction?: SubmitReportBodySkipRedaction;
 };

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X, Link2, ChevronDown, Play, AlertTriangle, Trash2, Mail } from "lucide-react";
+import { UploadCloud, Shield, FileText, Loader2, CheckCircle, XCircle, Search, Zap, Eye, HelpCircle, Lock, Fingerprint, ShieldCheck, Volume2, VolumeX, ClipboardPaste, Clock, ExternalLink, Info, X, Link2, ChevronDown, Play, AlertTriangle, Trash2, Mail, BrainCircuit, ShieldOff } from "lucide-react";
 import { LogoBeams } from "@/components/laser-effects";
 import { useSubmitReport, SubmitReportBodyContentMode, useGetReportFeed } from "@workspace/api-client-react";
 import { addHistoryEntry } from "@/lib/history";
@@ -584,6 +584,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [stage, setStage] = useState<UploadStage>("idle");
+  const [skipLlm, setSkipLlm] = useState(false);
+  const [skipRedaction, setSkipRedaction] = useState(false);
   const logoRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -705,7 +707,7 @@ export default function Home() {
         toast({ title: "Invalid file", description: error, variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { file, contentMode: mode, showInFeed: feedVal } });
+      submitMutation.mutate({ data: { file, contentMode: mode, showInFeed: feedVal, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } });
     } else if (inputMode === "link") {
       const trimmedUrl = reportUrl.trim();
       if (!trimmedUrl) {
@@ -716,7 +718,7 @@ export default function Home() {
         toast({ title: "Invalid URL", description: "Please enter a valid HTTPS URL.", variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { reportUrl: trimmedUrl, contentMode: mode, showInFeed: feedVal } as any });
+      submitMutation.mutate({ data: { reportUrl: trimmedUrl, contentMode: mode, showInFeed: feedVal, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } as any });
     } else {
       const trimmed = rawText.trim();
       if (trimmed.length === 0) {
@@ -727,7 +729,7 @@ export default function Home() {
         toast({ title: "Text too large", description: "Pasted text exceeds the 5MB limit.", variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { rawText: trimmed, contentMode: mode, showInFeed: feedVal } });
+      submitMutation.mutate({ data: { rawText: trimmed, contentMode: mode, showInFeed: feedVal, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } });
     }
   };
 
@@ -1014,6 +1016,60 @@ export default function Home() {
               </div>
             </RadioGroup>
           </div>
+
+          <div className="space-y-3">
+            <h3 className="font-medium flex items-center gap-2 text-sm">
+              <Zap className="w-4 h-4 text-primary" />
+              Analysis Options
+              <Explainer text="Control what happens during analysis. By default, both AI analysis and PII redaction are enabled." />
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={skipLlm}
+                  onChange={(e) => setSkipLlm(e.target.checked)}
+                  className="rounded border-border accent-primary w-4 h-4 mt-0.5"
+                  data-testid="toggle-skip-llm"
+                />
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                    <BrainCircuit className="w-3.5 h-3.5" />
+                    Skip AI analysis
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Disable LLM calls — analysis uses only local heuristic and statistical scoring. No report data is sent to any external AI provider.
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={skipRedaction}
+                  onChange={(e) => { setSkipRedaction(e.target.checked); if (e.target.checked) setSkipLlm(true); }}
+                  className="rounded border-border accent-primary w-4 h-4 mt-0.5"
+                  data-testid="toggle-skip-redaction"
+                />
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                    <ShieldOff className="w-3.5 h-3.5" />
+                    Disable PII redaction
+                  </span>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Skip PII auto-redaction. Report text will not be sanitized for personally identifiable information. AI analysis is automatically disabled when redaction is off to prevent unredacted data from reaching external services.
+                  </p>
+                </div>
+              </label>
+            </div>
+            {skipRedaction && (
+              <div className="rounded-lg bg-orange-500/10 border border-orange-500/30 px-3 py-2 flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <AlertTriangle className="w-3.5 h-3.5 text-orange-500 mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] text-orange-300 leading-relaxed">
+                  <strong>Warning:</strong> Only use for known slop submissions or local deployments. PII, secrets, and company names in your report will <strong>not</strong> be removed before storage or comparison.
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 px-4 sm:px-6">
           <Button
@@ -1170,6 +1226,34 @@ function TransparencySection() {
             <p className="text-xs text-muted-foreground leading-relaxed">
               <strong className="text-foreground">Important:</strong> If you close your tab or clear session storage, the delete token is gone. We cannot recover it, and we cannot delete the report on your behalf — by design, we have no way to identify who submitted what.
             </p>
+          </div>
+
+          <div className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4 space-y-3">
+            <h3 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+              <BrainCircuit className="w-4 h-4" />
+              How We Handle AI Analysis
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-foreground">When AI analysis is enabled (default)</h4>
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-blue-400">1.</span>Your report text is PII-redacted first (unless you disable redaction).</li>
+                  <li className="flex gap-2"><span className="text-blue-400">2.</span>The redacted text is truncated to 6,000 characters.</li>
+                  <li className="flex gap-2"><span className="text-blue-400">3.</span>That truncated snippet is sent to the <span className="text-foreground font-medium">OpenAI API</span> (gpt-4o-mini) via a managed proxy for semantic analysis across 5 dimensions.</li>
+                  <li className="flex gap-2"><span className="text-blue-400">4.</span>OpenAI's API data policy: they do <strong className="text-foreground">not</strong> train on API data. <a href="https://openai.com/enterprise-privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Read their policy</a>.</li>
+                  <li className="flex gap-2"><span className="text-blue-400">5.</span>The LLM score is fused with heuristic scores via Noisy-OR combination for a more robust result.</li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-foreground">When AI analysis is disabled</h4>
+                <ul className="space-y-1.5 text-xs text-muted-foreground">
+                  <li className="flex gap-2"><span className="text-green-400">&#10003;</span>No data leaves the server — analysis is purely local.</li>
+                  <li className="flex gap-2"><span className="text-green-400">&#10003;</span>Heuristic, linguistic, factual, and active verification axes still run.</li>
+                  <li className="flex gap-2"><span className="text-green-400">&#10003;</span>Results may be less precise for edge cases where LLM semantic analysis would have caught subtleties.</li>
+                  <li className="flex gap-2"><span className="text-green-400">&#10003;</span>Use the "Skip AI analysis" toggle in the submission form to opt out.</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-border/50 pt-3">

@@ -64,6 +64,16 @@ paths:
                   enum: ["true", "false"]
                   default: "false"
                   description: Whether to show this report in the public recent reports feed
+                skipLlm:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Skip LLM analysis — use only local heuristic/statistical scoring
+                skipRedaction:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Skip PII auto-redaction. Only use for known slop or local deployments.
               required:
                 - contentMode
       responses:
@@ -260,6 +270,16 @@ paths:
                 reportUrl:
                   type: string
                   description: HTTPS URL to a plain-text report (GitHub raw, Gist, GitLab, Pastebin, etc.). Auto-converts GitHub blob URLs to raw. Max 5MB.
+                skipLlm:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Skip LLM analysis — use only local heuristic/statistical scoring
+                skipRedaction:
+                  type: string
+                  enum: ["true", "false"]
+                  default: "false"
+                  description: Skip PII auto-redaction. Only use for known slop or local deployments.
               required: []
       responses:
         "200":
@@ -564,6 +584,12 @@ components:
         llmEnhanced:
           type: boolean
           description: True when LLM analysis contributed to the final slopScore. False means the score is purely heuristic.
+        llmUsed:
+          type: boolean
+          description: Whether LLM analysis was attempted (not skipped by user). When false, the user explicitly opted out of AI analysis.
+        redactionApplied:
+          type: boolean
+          description: Whether PII auto-redaction was applied. When false, the user explicitly disabled redaction.
         verification:
           oneOf:
             - $ref: "#/components/schemas/Verification"
@@ -712,6 +738,12 @@ components:
           description: Active sensitivity preset used for score adjustment. Null when default.
         llmEnhanced:
           type: boolean
+        llmUsed:
+          type: boolean
+          description: Whether LLM analysis was attempted (not skipped by user).
+        redactionApplied:
+          type: boolean
+          description: Whether PII auto-redaction was applied.
         verification:
           oneOf:
             - $ref: "#/components/schemas/Verification"
