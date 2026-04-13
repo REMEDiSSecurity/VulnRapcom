@@ -11,6 +11,8 @@ export interface ScoreBreakdown {
   llm: number | null;
   verification: number | null;
   quality: number;
+  llmUsed?: boolean;
+  redactionApplied?: boolean;
 }
 
 export interface EvidenceItem {
@@ -206,6 +208,63 @@ export function fuseScores(
     breakdown,
     evidence: allEvidence,
     humanIndicators: humanResult.indicators,
+    slopTier: getSlopTier(slopScore, thr),
+  };
+}
+
+export function recomputeSlopScoreWithoutLlm(
+  breakdown: { linguistic: number; factual: number; template: number; verification?: number | null },
+  evidenceItems: EvidenceItem[],
+  originalText: string,
+): { slopScore: number; confidence: number; slopTier: string } {
+  const thr = loadThresholds();
+
+  const hasFabricationBoost = evidenceItems.some(
+    e => e.type === "hallucinated_function" || e.type === "fabricated_cve" || e.type === "future_cve" || e.type === "fake_asan"
+  );
+
+  const axisScores: { name: string; score: number }[] = [
+    { name: "linguistic", score: breakdown.linguistic },
+    { name: "factual", score: breakdown.factual },
+    { name: "template", score: breakdown.template },
+  ];
+  if (breakdown.verification != null) {
+    axisScores.push({ name: "verification", score: breakdown.verification });
+  }
+
+  const activeAxes = axisScores.filter(
+    a => a.score > (AXIS_THRESHOLDS[a.name] ?? 10)
+  );
+
+  let slopScore: number;
+  if (activeAxes.length === 0) {
+    slopScore = PRIOR;
+  } else {
+    const probabilities = activeAxes.map(a => {
+      let p = a.score / 100;
+      if (hasFabricationBoost && a.name === "factual") {
+        p = Math.min(1, p * 1.3);
+      }
+      return Math.max(0, Math.min(0.95, p));
+    });
+    const combinedP = 1 - probabilities.reduce((prod, p) => prod * (1 - p), 1);
+    slopScore = Math.round(PRIOR + combinedP * (CEILING - PRIOR));
+  }
+
+  const humanResult = detectHumanIndicators(originalText);
+  slopScore = Math.max(FLOOR, slopScore + humanResult.totalReduction);
+  slopScore = Math.min(100, Math.max(0, slopScore));
+
+  const nonLlmEvidence = evidenceItems.filter(e => e.type !== "llm_red_flag" && e.type !== "llm_observation");
+  const evidenceCount = nonLlmEvidence.filter(e => e.weight >= 5).length;
+  const confidence = Math.min(
+    1.0,
+    0.3 + evidenceCount * 0.07 + humanResult.indicators.length * 0.03
+  );
+
+  return {
+    slopScore,
+    confidence: Math.round(confidence * 100) / 100,
     slopTier: getSlopTier(slopScore, thr),
   };
 }

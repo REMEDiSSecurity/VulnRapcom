@@ -23,7 +23,7 @@ import { analyzeSloppiness } from "../lib/sloppiness";
 import { analyzeSlopWithLLM, shouldCallLLM, isLLMAvailable, type LLMSlopResult } from "../lib/llm-slop";
 import { analyzeLinguistic } from "../lib/linguistic-analysis";
 import { analyzeFactual } from "../lib/factual-verification";
-import { fuseScores, type FusionResult, type EvidenceItem } from "../lib/score-fusion";
+import { fuseScores, recomputeSlopScoreWithoutLlm, type FusionResult, type EvidenceItem } from "../lib/score-fusion";
 import { redactReport } from "../lib/redactor";
 import { parseSections, findSectionMatches } from "../lib/section-parser";
 import { sanitizeText, sanitizeFileName, detectBinaryContent } from "../lib/sanitize";
@@ -481,7 +481,7 @@ router.post("/reports", async (req, res): Promise<void> => {
         slopTier: analysisResult.slopTier,
         qualityScore: analysisResult.qualityScore,
         confidence: analysisResult.confidence,
-        breakdown: { ...analysisResult.breakdown, llmUsed, redactionApplied } as any,
+        breakdown: { ...analysisResult.breakdown, llmUsed, redactionApplied },
         evidence: analysisResult.evidence,
         humanIndicators: analysisResult.humanIndicators,
         similarityMatches,
@@ -703,13 +703,33 @@ router.post("/reports/check", async (req, res): Promise<void> => {
       );
     } catch {}
 
+    const cachedHadLlm = cached.llmSlopScore != null;
+    const stripLlm = skipLlm && cachedHadLlm;
+
+    let responseSlopScore = cached.slopScore;
+    let responseSlopTier = cached.slopTier;
+    let responseConfidence = cached.confidence;
+    let responseBreakdown = cached.breakdown;
+    let responseEvidence = cached.evidence;
+
+    if (stripLlm && cached.breakdown) {
+      const bd = cached.breakdown as import("@workspace/db").ScoreBreakdown;
+      const allEvidence = (cached.evidence || []) as EvidenceItem[];
+      const recomputed = recomputeSlopScoreWithoutLlm(bd, allEvidence, analysisText);
+      responseSlopScore = recomputed.slopScore;
+      responseSlopTier = recomputed.slopTier;
+      responseConfidence = recomputed.confidence;
+      responseBreakdown = { ...bd, llm: null, llmUsed: false, redactionApplied };
+      responseEvidence = allEvidence.filter(e => e.type !== "llm_red_flag" && e.type !== "llm_observation");
+    }
+
     const response = CheckReportResponse.parse({
-      slopScore: cached.slopScore,
-      slopTier: cached.slopTier,
+      slopScore: responseSlopScore,
+      slopTier: responseSlopTier,
       qualityScore: cached.qualityScore,
-      confidence: cached.confidence,
-      breakdown: cached.breakdown,
-      evidence: cached.evidence,
+      confidence: responseConfidence,
+      breakdown: responseBreakdown,
+      evidence: responseEvidence,
       humanIndicators: cached.humanIndicators,
       similarityMatches: cached.similarityMatches,
       sectionHashes: cached.sectionHashes,
@@ -719,7 +739,7 @@ router.post("/reports/check", async (req, res): Promise<void> => {
       llmSlopScore: skipLlm ? null : (cached.llmSlopScore ?? null),
       llmFeedback: skipLlm ? null : (cached.llmFeedback ?? null),
       llmBreakdown: skipLlm ? null : (cached.llmBreakdown ?? null),
-      llmEnhanced: skipLlm ? false : (cached.llmSlopScore != null),
+      llmEnhanced: skipLlm ? false : cachedHadLlm,
       llmUsed: !skipLlm,
       redactionApplied,
       verification: null,
@@ -1138,8 +1158,8 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     llmFeedback: report.llmFeedback ?? null,
     llmBreakdown: report.llmBreakdown ?? null,
     llmEnhanced: report.llmSlopScore != null,
-    llmUsed: (report.breakdown as unknown as Record<string, unknown>)?.llmUsed !== false,
-    redactionApplied: (report.breakdown as unknown as Record<string, unknown>)?.redactionApplied !== false,
+    llmUsed: (report.breakdown as import("@workspace/db").ScoreBreakdown | null)?.llmUsed !== false,
+    redactionApplied: (report.breakdown as import("@workspace/db").ScoreBreakdown | null)?.redactionApplied !== false,
     verification,
     triageRecommendation,
     triageAssistant,

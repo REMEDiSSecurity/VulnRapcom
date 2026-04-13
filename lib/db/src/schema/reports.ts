@@ -13,6 +13,8 @@ export interface ScoreBreakdown {
   template: number;
   llm: number | null;
   quality: number;
+  llmUsed?: boolean;
+  redactionApplied?: boolean;
 }
 
 export interface EvidenceItem {
