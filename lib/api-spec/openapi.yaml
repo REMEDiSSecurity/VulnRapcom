@@ -68,12 +68,12 @@ paths:
                   type: string
                   enum: ["true", "false"]
                   default: "false"
-                  description: Skip LLM analysis — use only local heuristic/statistical scoring
+                  description: Skip LLM analysis — use only local heuristic/statistical scoring. Sent as string in multipart form data. Forced to "true" server-side when skipRedaction is "true".
                 skipRedaction:
                   type: string
                   enum: ["true", "false"]
                   default: "false"
-                  description: Skip PII auto-redaction. Only use for known slop or local deployments.
+                  description: Skip PII auto-redaction. When enabled, LLM analysis is automatically disabled to prevent unredacted data from reaching external services. Sent as string in multipart form data.
               required:
                 - contentMode
       responses:
@@ -274,12 +274,12 @@ paths:
                   type: string
                   enum: ["true", "false"]
                   default: "false"
-                  description: Skip LLM analysis — use only local heuristic/statistical scoring
+                  description: Skip LLM analysis — use only local heuristic/statistical scoring. Sent as string in multipart form data. Forced to "true" server-side when skipRedaction is "true".
                 skipRedaction:
                   type: string
                   enum: ["true", "false"]
                   default: "false"
-                  description: Skip PII auto-redaction. Only use for known slop or local deployments.
+                  description: Skip PII auto-redaction. When enabled, LLM analysis is automatically disabled to prevent unredacted data from reaching external services. Sent as string in multipart form data.
               required: []
       responses:
         "200":

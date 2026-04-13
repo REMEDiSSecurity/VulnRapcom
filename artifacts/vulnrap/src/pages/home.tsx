@@ -718,7 +718,7 @@ export default function Home() {
         toast({ title: "Invalid URL", description: "Please enter a valid HTTPS URL.", variant: "destructive" });
         return;
       }
-      submitMutation.mutate({ data: { reportUrl: trimmedUrl, contentMode: mode, showInFeed: feedVal, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } as any });
+      submitMutation.mutate({ data: { reportUrl: trimmedUrl, contentMode: mode, showInFeed: feedVal, skipLlm: skipLlm ? "true" : "false", skipRedaction: skipRedaction ? "true" : "false" } });
     } else {
       const trimmed = rawText.trim();
       if (trimmed.length === 0) {
