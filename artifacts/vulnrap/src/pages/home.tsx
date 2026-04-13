@@ -522,7 +522,8 @@ function VideoSection() {
       >
         <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
           <Play className="w-4 h-4" />
-          Watch the intro
+          Watch the rap sheet
+          <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-primary/20 text-primary border border-primary/30 animate-pulse">New</span>
         </span>
         <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
