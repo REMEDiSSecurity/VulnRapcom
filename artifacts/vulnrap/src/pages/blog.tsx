@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
 import logoSrc from "@/assets/logo.png";
+import { BlogBuildingVulnrap } from "@/components/blog-building-vulnrap";
 
 function FirstPost() {
   return (
@@ -138,12 +139,18 @@ export default function Blog() {
 
       <Card className="glass-card rounded-xl">
         <CardContent className="p-8">
+          <BlogBuildingVulnrap />
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card rounded-xl">
+        <CardContent className="p-8">
           <FirstPost />
         </CardContent>
       </Card>
 
       <div className="text-center text-xs text-muted-foreground/50 pb-4">
-        <p>More posts coming as we ship new features. <a href="https://github.com/REMEDiSSecurity/VulnRapcom" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Follow the project on GitHub</a> to stay updated.</p>
+        <p><a href="https://github.com/REMEDiSSecurity/VulnRapcom" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Follow the project on GitHub</a> to stay updated.</p>
       </div>
     </div>
   );

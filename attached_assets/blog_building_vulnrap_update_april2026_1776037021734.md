@@ -283,7 +283,7 @@ All of this comes from a single LLM call at approximately $0.005 per report. At 
 
 The LLM produces initial reproduction steps, but we also built structured reproduction templates for eight common vulnerability classes as both a fallback (when LLM is unavailable) and an enrichment layer (LLM steps + heuristic environment notes).
 
-Each template covers XSS, SQL injection, SSRF, deserialization, buffer overflow, path traversal, authentication bypass, and race conditions. Every template includes detection regex, step generation functions that extract version and endpoint information from the report text, and environment-specific notes that are hard to generate from scratch.
+Each template covers XSS, SQL injection, SSRF, deserialization, buffer overflow, path traversal, authentication bypass, and race conditions. Every template includes detection patterns, structured reproduction steps, and environment-specific notes that are hard to generate from scratch.
 
 For example, the buffer overflow template tells the triager: "Compile with AddressSanitizer: `CFLAGS='-fsanitize=address' ./configure && make`. Run the PoC. Check ASan output for crash location. Compare with the report's claims. Also run Valgrind as a second opinion." And the environment notes warn: "Buffer overflows behave differently on 32-bit vs 64-bit. ASLR and stack canaries affect exploitability but not existence. If the report claims RCE from a heap overflow, that requires heap grooming which is highly environment-specific."
 
@@ -329,7 +329,7 @@ The feedback is designed to be professional and constructive — not accusatory.
 
 ### UI Integration
 
-The triage report renders as a tabbed panel (Reproduce, Gaps, Don't Miss, Reporter Feedback) with a "Copy for Ticket" button that generates formatted markdown suitable for pasting into Jira, ServiceNow, or GitHub Issues. One click gives the triager a complete triage summary they can attach to the ticket.
+The triage report renders as a tabbed panel (Reproduce, Gaps, Don't Miss, Reporter Feedback) with a copy button that generates formatted markdown suitable for pasting into Jira, ServiceNow, or GitHub Issues. One click gives the triager a complete triage summary they can attach to the ticket.
 
 The results page also includes several visualization features designed for at-a-glance triage:
 
@@ -374,7 +374,7 @@ We believe in being transparent about where the system's limits are. Two reports
 
 **The sophisticated race condition (S08)**: Scored 34. Well-written slop with no AI fingerprints, realistic technical depth, and plausible-sounding analysis. It used `example.com` in a curl command (detected as one factual signal) but the linguistic and template axes found nothing.
 
-Both of these require either the LLM analysis axis (still being debugged) or the factual verification layer (Sprint 3) to catch. When someone puts effort into making slop look real — uses real function names, avoids AI phrases, writes in a natural voice — the style detection layers can't catch it. That's by design. Style detection has a shelf life. Factual verification doesn't.
+Both of these require either the LLM analysis axis or the factual verification layer (Sprint 3) to catch. When someone puts effort into making slop look real — uses real function names, avoids AI phrases, writes in a natural voice — the style detection layers can't catch it. That's by design. Style detection has a shelf life. Factual verification doesn't.
 
 If someone writes a polished report about a race condition in `curl_easy_perform()` and that function actually exists and the described behavior is plausible — well, either they did real research or they got lucky. Either way, it deserves human review.
 
@@ -407,7 +407,7 @@ Here's where VulnRap stands today, measuring from our initial baseline to the mo
 | False positive rate (legit flagged as slop) | 47% | 12.5% | -34.5 percentage points |
 | Detection axes | 1 (quality) | 4 (linguistic, factual, template, LLM) | 4x coverage |
 
-And these numbers are WITHOUT the LLM axis active. When we get that debugged, we expect the AUC to push above 0.85 and accuracy above 90%.
+The LLM axis is now active and integrated into the scoring pipeline, adding semantic depth to the heuristic signals. We expect the AUC to continue climbing above 0.85 as we gather more data.
 
 ---
 
