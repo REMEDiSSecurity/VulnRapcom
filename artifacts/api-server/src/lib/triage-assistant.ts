@@ -318,7 +318,11 @@ export function analyzeGaps(
   const gaps: GapItem[] = [];
   const lower = text.toLowerCase();
 
-  const hasVersionInfo = /\b\d+\.\d+\.\d+\b/.test(text);
+  const versionMatches = text.match(/\b\d+\.\d+(?:\.\d+)?\b/g) || [];
+  const hasVersionInfo = versionMatches.length > 0;
+  const hasVersionRange = /\b(?:through|to|thru|–|->|\.\.)\s*\d+\.\d+/i.test(text) ||
+    /\b(?:before|prior\s+to|up\s+to|<=?)\s*(?:v(?:ersion)?\s*)?\d+\.\d+/i.test(text);
+
   if (!hasVersionInfo) {
     gaps.push({
       category: "missing_version",
@@ -328,10 +332,22 @@ export function analyzeGaps(
       triagerGuidance: "Cannot determine if your deployment is affected. Check adjacent versions if a single version is provided later.",
       reporterGuidance: "Please provide the exact software version (major.minor.patch) where you observed the vulnerability, including build identifiers if available.",
     });
+  } else if (versionMatches.length === 1 && !hasVersionRange) {
+    gaps.push({
+      category: "single_version_only",
+      severity: "minor",
+      description: "Only a single version mentioned — no affected range specified",
+      suggestion: "Ask whether adjacent versions are also affected and what the fix version is",
+      triagerGuidance: "A single version may indicate the reporter only tested one build. Test adjacent versions to determine the full blast radius.",
+      reporterGuidance: "If possible, specify the range of affected versions (e.g., '2.0.0 through 2.3.1') and which version introduced the fix.",
+    });
   }
 
   const hasCodeBlock = /```[\s\S]*?```/.test(text) || /^\s{4,}\S/m.test(text);
   const hasPocIndicator = /\b(?:proof[- ]?of[- ]?concept|poc|exploit|payload|reproduce)\b/i.test(text);
+  const hasExecutablePoc = /```(?:bash|sh|python|curl|http|javascript|js|ruby|perl|php|powershell)\b/i.test(text) ||
+    /\bcurl\s+-/i.test(text) || /\b(?:import\s|require\(|fetch\(|requests\.)/i.test(text);
+
   if (!hasCodeBlock && !hasPocIndicator) {
     gaps.push({
       category: "missing_poc",
@@ -340,6 +356,15 @@ export function analyzeGaps(
       suggestion: "Request a working PoC with exact HTTP requests/responses, code snippets, or command-line steps",
       triagerGuidance: "Without a PoC, reproduction will require building the attack from scratch. Consider asking for a self-contained reproduction script before investing time.",
       reporterGuidance: "Please provide a working proof-of-concept: exact HTTP requests/responses, code snippets, or command-line steps that demonstrate the vulnerability.",
+    });
+  } else if (hasPocIndicator && !hasExecutablePoc && !hasCodeBlock) {
+    gaps.push({
+      category: "narrative_poc_only",
+      severity: "important",
+      description: "PoC is described in narrative form but no executable code or commands are provided",
+      suggestion: "Request executable reproduction artifacts: curl commands, scripts, or exact HTTP request/response pairs",
+      triagerGuidance: "Narrative-only PoCs require manual translation to reproduce. Request a self-contained script or curl command to reduce reproduction time.",
+      reporterGuidance: "Your PoC description is helpful, but please also include executable reproduction code (curl commands, a script, or exact HTTP request/response pairs) for faster validation.",
     });
   }
 
@@ -803,17 +828,18 @@ function mergeReproGuidance(
   if (!heuristic && !llmGuidance?.reproSteps?.length) return null;
 
   if (heuristic && llmGuidance?.reproSteps?.length) {
-    const heuristicSteps: ReproStep[] = heuristic.steps.map(s => ({ ...s, source: "heuristic" as const }));
     const llmSteps: ReproStep[] = llmGuidance.reproSteps.map((instruction, i) => ({
-      order: heuristicSteps.length + i + 1,
+      order: i + 1,
       instruction,
       source: "llm" as const,
       note: "AI-suggested",
     }));
-    const existingInstructions = new Set(heuristicSteps.map(s => s.instruction.toLowerCase().trim()));
-    const uniqueLlmSteps = llmSteps.filter(s => !existingInstructions.has(s.instruction.toLowerCase().trim()));
+    const llmInstructions = new Set(llmSteps.map(s => s.instruction.toLowerCase().trim()));
+    const uniqueHeuristicSteps: ReproStep[] = heuristic.steps
+      .filter(s => !llmInstructions.has(s.instruction.toLowerCase().trim()))
+      .map(s => ({ ...s, source: "heuristic" as const, note: s.note || "Heuristic enrichment" }));
 
-    const mergedSteps = [...heuristicSteps, ...uniqueLlmSteps].map((s, i) => ({ ...s, order: i + 1 }));
+    const mergedSteps = [...llmSteps, ...uniqueHeuristicSteps].map((s, i) => ({ ...s, order: i + 1 }));
 
     return {
       ...heuristic,
